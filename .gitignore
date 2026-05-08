@@ -1,0 +1,9 @@
+# DEEPSHIP — session artifacts (not version-controlled)
+DeepMemories/decisions/
+DeepMemories/sessions/
+DeepMemories/approvals/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
