@@ -91,6 +91,8 @@
 | 2026-05-08 19:00 | 框架演进 | minor | refactor | B.8 深度模块与接口设计 + 逃逸出口；D.6/D.7 重写为自然沟通系统；D.2 精简为 5 阻塞模式；Documentation §7 简化 | 无破坏性变化 | Implement.md, Prompt.md, Documentation.md | 人工 review |
 | 2026-05-10 18:00 | Superpowers 融合 | minor | feature | +CLARIFY_INTENT 状态（需求澄清）；+TDD 内循环 + 并行子代理分派；Heartbeat 升级为 commit 风格实时报备；+D.6.6 交付总结；A.5 审查分 AI 自审/人类审查两层；工具索引新增 15 个 Superpowers+Ralph 技能；+§11 代码模式沉淀区 | 无破坏性变化 | Implement.md, Documentation.md | 人工 review |
 | 2026-05-10 | 契约同步 + 项目隔离 + 自验证 | minor | feature | C.2.1 契约同步 ≠ 扩 Diff；Prompt §6 契约同步原则；C.1 新增契约检查+ReAct 自省（code-reviewer/verify.py）；VALIDATE 嵌入架构自省；项目实例架构（`.claude/DEEPSHIP/`）；checks/verify.py 自验证脚本 | 项目实例路径变化：`<项目>/DEEPSHIP/` → `<项目>/.claude/DEEPSHIP/` | Implement.md, Prompt.md, README.md, Documentation.md + 新增 .claude/DEEPSHIP/*, checks/verify.py | verify.py 4 检查中 3 PASS（Implement.md 918 行留 M2） |
+| 2026-05-10 | 结构优化（M2） | minor | refactor | Implement.md 918行→拆为 `implement/` 目录（6 文件，最大 278 行）；移除 DeepMemories（3版本空壳）；清理 projects/ 临时目录 | 执行手册从单文件变为目录；DeepMemories 引用全部更新 | Implement.md→implement/*, Documentation.md, .gitignore, README.md, verify.py | verify.py ALL PASS |
+| 2026-05-10 | Superpowers 深入融合 + Ralph 管道 | minor | feature | CLARIFY_INTENT 硬门禁（批准前禁实现）；EXECUTE SDD 两级审查门（Spec→Quality）；VALIDATE 验证铁律（IDENTIFY→RUN→READ→VERIFY→CLAIM）；D.1.1 TDD 反借口表；PLAN_STEP 工作单元 spec 模板 + 复杂度 Tier 1-3；D.1.2 合并队列规则；REPAIR 卡壳恢复协议；tools.md A.0 EXECUTE 拆三行 + SDD 描述修正 | 无破坏性变化 | implement/state-machine.md, implement/tools.md | verify.py ALL PASS |
 
 ### 文档更新规则
 
