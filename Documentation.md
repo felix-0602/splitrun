@@ -3,6 +3,7 @@
 > **用途**：工程的"黑匣子"——让任何人在任何时候打开都能知道到哪了、做了什么决策、怎么跑、有什么坑。
 > **更新频率**：**每个 milestone 完成后**必须更新；重大决策随时追加。
 > **写作者**：AI 自治维护；人复盘时审阅。
+> **每个项目一份**：新项目拷贝到 `<项目>/.claude/DEEPSHIP/Documentation.md`。本全局文件同时记录 DEEPSHIP 框架自身的演进（§2/§4/§7）。
 
 ---
 
@@ -10,11 +11,11 @@
 
 | 字段 | 值 |
 |------|-----|
-| 当前 Milestone | M1→M2 交接中 |
-| 状态 | in_progress |
-| 整体完成率 | M1:核心完成 / M2:待启动 |
-| 上次更新 | 2026-05-10 18:00 |
-| 框架版本 | DEEPSHIP v1.2（+Superpowers + 突触适配） |
+| 当前 Milestone | [当前 milestone 名称] |
+| 状态 | [pending / in_progress / done] |
+| 整体完成率 | [大概百分比或描述] |
+| 上次更新 | [YYYY-MM-DD HH:mm] |
+| 框架版本 | [如 DEEPSHIP v1.2] |
 
 ---
 
@@ -27,6 +28,7 @@
 | 2026-05-08 | 引入"模块深度"质量维度与接口优先设计规则（Implement.md B.8, Prompt.md §7） | 模块的第一性原理是可测试性：接口是测试面，浅模块集群让 bug 埋在实现细节里，接缝只在有 ≥2 个适配器时才成立。源自 Matt Pocock skills 工程实践 | 不引入：DEEPSHIP 只停留在项目管理层，不进入代码结构层 |
 | 2026-05-08 | D.6/D.7 重写为 Heartbeat + Mode Word + Help Gradient 自然沟通系统；D.2 从 14 条精简为 5 个阻塞模式；Documentation §7 从 16 字段简化为 5 字段 | 原有合规检查清单式的汇报机制产生压力而非产生信任——规则变成了"向用户证明你在工作"。新系统基于自然对话节奏，heartbeat 就是进度，求助梯度在 BLOCK 之前提供了更轻量的求助方式 | 保留旧版：叠加更多汇报模板和合规字段 |
 | 2026-05-10 | 将 Superpowers（obra/superpowers v5.1.0）和 Ralph（snarktank/ralph）的核心设计融入 DEEPSHIP 框架 | Superpowers 的 brainstorming、TDD 内循环、subagent-driven-development、两级审查和 Ralph 的模式沉淀机制填补了 DEEPSHIP 的关键空白：需求澄清、测试前置、并行执行、人类协作和知识固化。全部改动以融合而非替换方式完成——Superpowers 作为工具索引中的可用技能，DEEPSHIP 状态机作为执行框架 | 不融合：DEEPSHIP 和 Superpowers 各自独立使用，用户需要在两个系统间手动切换 |
+| 2026-05-10 | ECC skill 生态裁剪：309→59 DAILY、250 LIBRARY；agents 69→21 DAILY、48 LIBRARY。Superpowers 重疊 skill 以 Superpowers 版本优先 | `/doctor` 报告 273 个 skill 描述被丢弃——ECC 全量安装导致上下文预算溢出。采用 agent-sort 分类：按实际使用记录（skillUsage）、语言栈匹配（Python/TS 保留，Go/Rust/Kotlin/Swift 等入 LIBRARY）、gstack 生态优先（用户主工具链）、领域专用归类（物流/金融/医疗/能源 22 个归入 LIBRARY）。突触 (architect-mentor) 保持完整不裁剪——其高质量示例和模板是教学核心，不应为省 token 降质。Superpowers 的 16 个 skill 质量高于 ECC 同名版本（人工审查 vs 全量倾泻），ECC 版本入 LIBRARY | 不裁剪：继续承受 273 描述丢弃；删除 22 个领域专用 skill（用户选择保留）；裁剪突触（用户选择保持完整） |
 
 ---
 
@@ -88,6 +90,7 @@
 |------|-----------|----------|----------|--------------|--------------|----------|------|
 | 2026-05-08 19:00 | 框架演进 | minor | refactor | B.8 深度模块与接口设计 + 逃逸出口；D.6/D.7 重写为自然沟通系统；D.2 精简为 5 阻塞模式；Documentation §7 简化 | 无破坏性变化 | Implement.md, Prompt.md, Documentation.md | 人工 review |
 | 2026-05-10 18:00 | Superpowers 融合 | minor | feature | +CLARIFY_INTENT 状态（需求澄清）；+TDD 内循环 + 并行子代理分派；Heartbeat 升级为 commit 风格实时报备；+D.6.6 交付总结；A.5 审查分 AI 自审/人类审查两层；工具索引新增 15 个 Superpowers+Ralph 技能；+§11 代码模式沉淀区 | 无破坏性变化 | Implement.md, Documentation.md | 人工 review |
+| 2026-05-10 | 契约同步 + 项目隔离 + 自验证 | minor | feature | C.2.1 契约同步 ≠ 扩 Diff；Prompt §6 契约同步原则；C.1 新增契约检查+ReAct 自省（code-reviewer/verify.py）；VALIDATE 嵌入架构自省；项目实例架构（`.claude/DEEPSHIP/`）；checks/verify.py 自验证脚本 | 项目实例路径变化：`<项目>/DEEPSHIP/` → `<项目>/.claude/DEEPSHIP/` | Implement.md, Prompt.md, README.md, Documentation.md + 新增 .claude/DEEPSHIP/*, checks/verify.py | verify.py 4 检查中 3 PASS（Implement.md 918 行留 M2） |
 
 ### 文档更新规则
 
@@ -157,7 +160,7 @@
 
 | 时间 | Milestone | 完成了什么 | 下一步 | 需要你判断 |
 |------|-----------|-----------|--------|-----------|
-| 2026-05-10 18:00 | DEEPSHIP v1.1 | 与用户讨论 Superpowers/Ralph 启示后，完成 7 项框架改进：CLARIFY_INTENT 状态、TDD 内循环+并行分派、两级汇报机制、审查分层、工具索引 15+ 条更新、代码模式沉淀区 | 无框架层面的下一步；用户将继续用更新后的 DEEPSHIP 推进 netclass-sidekick 项目 | 无 |
+| 2026-05-10 19:45 | DEEPSHIP v1.2 | ECC skill 裁剪完成：skills 309→59 DAILY / 250 LIBRARY，agents 69→21 DAILY / 48 LIBRARY。Superpowers 重疊 skill 以 Superpowers 版本优先，ECC 同名版本入 LIBRARY。修复 fork bomb deny 规则解析错误。突触保持完整不裁剪 | 验证：下一会话观察 `/doctor` 的 dropped descriptions 数量 | 无 |
 
 ### 运行记录详情
 

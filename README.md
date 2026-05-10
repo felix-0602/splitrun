@@ -14,17 +14,45 @@
 ## 核心流程
 
 ```
-READ_CONTEXT → MAP_REALITY → SELECT_MILESTONE → PLAN_STEP
-  → EXECUTE → VALIDATE → RECORD → ADVANCE | REPAIR | BLOCK
+READ_CONTEXT
+  → CLARIFY_INTENT（目标模糊时触发，否则跳过）
+  → MAP_REALITY → SELECT_MILESTONE → PLAN_STEP
+  → EXECUTE（含 TDD 内循环 + 并行子代理分派）
+  → VALIDATE → RECORD → ADVANCE | REPAIR | BLOCK
 ```
 
 ## 关键原则
 
 - **Reality-First**：制定计划前必须用代码搜索确认真实入口、调用链路、契约和既有断点
-- **Milestone 汇报**：进度按 milestone 层级展示，不用平铺 Task 列表
+- **契约同步**：改函数签名/API/env/类型/启动命令时，文档和测试是同一改动的组成部分，不是扩 diff
+- **模块深度**：接口即测试面；mock 超过 2 个说明模块太浅；一个适配器的接缝是废抽象
+- **TDD 内循环**：红→绿→重构，先写测试定义契约，再写最小实现
 - **报错反馈**：现象→根因→修复→剩余风险，不悄悄修
-- **会话透明**：错误及时解释、方向切换告知、验证结果主动汇报
+- **交付总结**：milestone 完成时主动列出已实现/已知局限/需要你决策
 - **双向一致**：修改 DEEPSHIP 时检查 Claude Code harness 联动的配置和规则
+
+## 项目结构
+
+DEEPSHIP 分两层：**全局框架**（一份）+ **项目实例**（每个项目一份）。
+
+```
+~/.claude/DEEPSHIP/                    ← 全局框架（模板 + 执行手册）
+  Prompt.md                            ← 通用模板
+  Plan.md                              ← 通用模板
+  Documentation.md                     ← 通用模板（含框架自身演进记录）
+  Implement.md                         ← 执行手册（全局共享）
+  README.md                            ← 本文件
+  checks/verify.py                     ← 自验证脚本
+
+<项目>/.claude/DEEPSHIP/               ← 每个项目自己的真相源
+  Prompt.md                            ← 项目目标、硬约束、Done When
+  Plan.md                              ← Milestone、AC、Reality Scan
+  Documentation.md                     ← 项目进度、决策、已知问题
+```
+
+**新项目初始化**：在项目根目录下执行 `mkdir -p .claude/DEEPSHIP`，然后从全局 `~/.claude/DEEPSHIP/` 拷贝 `Prompt.md`、`Plan.md`、`Documentation.md` 三个模板。
+
+**自验证**：`python checks/verify.py` 检测跨文件引用漂移、状态机一致性、模板污染和文件大小。
 
 ## 安装
 

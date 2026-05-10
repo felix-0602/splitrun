@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(unzip -l mattpocock-skills-main.zip)",
+      "Bash(unzip -o mattpocock-skills-main.zip -d mattpocock-skills-main)",
+      "Bash(git *)",
+      "Bash(mkdir -p \"C:/Users/27464/.claude/DEEPSHIP/projects/netclass-sidekick\")",
+      "Bash(cp \"C:/Users/27464/.claude/DEEPSHIP/Plan.md\" \"C:/Users/27464/.claude/DEEPSHIP/projects/netclass-sidekick/Plan.md\")",
+      "Bash(python *)"
+    ]
+  }
+}
