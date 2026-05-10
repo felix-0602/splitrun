@@ -20,7 +20,9 @@
 | `CLARIFY_INTENT` | `Skill(brainstorming)` | 目标已有可观测行为描述时跳过整个状态 | 目标模糊→追问；目标清晰→直接进入 MAP_REALITY |
 | `MAP_REALITY` | `Grep`, `Glob`, `Read`, `Agent(code-explorer)` | 小改动且入口/链路已确凿时简化为单次 Grep | 必须确认：用户入口、调用链路、既有断点 |
 | `PLAN_STEP` | `Skill(writing-plans)`, `Agent(planner)`, `EnterPlanMode` | <3 文件且无架构影响时直接列步骤 | >5 文件或 schema 变更 → 强制 EnterPlanMode |
-| `EXECUTE` | `Skill(test-driven-development)`, `Skill(subagent-driven-development)`, `Skill(dispatching-parallel-agents)` + 语言专精 agent（见 A.3.2） | 单文件简单改动时直接写代码 | 有独立子任务→并行分派；有测试框架→先写测试 |
+| `EXECUTE` — 单任务 | `Skill(test-driven-development)` + 语言专精 agent（见 A.3.2） | 改动 < 3 文件且逻辑简单时直接写 | 先写测试（RED）→ 最小实现（GREEN）→ 重构 |
+| `EXECUTE` — 多任务串行 | `Skill(subagent-driven-development)` | 单文件简单改动时不用 SDD | 任务互不依赖但不能并行（共享状态）→ 每任务走 SDD 两级审查（Spec → Quality） |
+| `EXECUTE` — 多任务并行 | `Skill(dispatching-parallel-agents)` | 任务有依赖时回退到串行 | 任务操作不同文件、无共享状态 → 同时启动多个 agent |
 | `VALIDATE` | 按 Plan.md 验证命令执行 + `Skill(verification-before-completion)` | —（不跳，但范围可变：最小相关验证到全量收尾验证） | 优先跑 milestone 明确列出的命令 |
 | `REPAIR` | `Skill(systematic-debugging)` | 根因一眼可见时直接修 | 连续 3 次修复失败 → BLOCK |
 | `RECORD` | 更新 `Documentation.md` | —（不跳，但密度可变：一句话摘要到详细记录） | ADVANCE 时必须写交付总结（D.6.6 格式） |
@@ -114,8 +116,8 @@
 
 | 场景 | 工具 | 说明 |
 |------|------|------|
-| **子代理驱动开发** | `Skill(subagent-driven-development)` | 将 plan 拆出的任务分派给独立 subagent 并行执行，各自审查后汇总 |
-| **并行代理分派** | `Skill(dispatching-parallel-agents)` | 2+ 个互不依赖的任务同时启动 agents，独立完成后合并结果 |
+| **子代理驱动开发（SDD）** | `Skill(subagent-driven-development)` | 多任务**串行**执行：每任务 → 实现子代理 → Spec 合规审查 → Code Quality 审查 → 两个审查都 ✅ 才能下一个任务。全程不暂停问"要继续吗" |
+| **并行代理分派** | `Skill(dispatching-parallel-agents)` | 2+ 个**互不依赖、操作不同文件**的任务同时启动 agents。完成汇总后检查冲突 |
 | 代码简化/规范 | `Agent(code-simplifier)` | 保持行为不变 |
 | 死代码清理 | `Agent(refactor-cleaner)` | knip/depcheck/ts-prune |
 | 性能优化 | `Agent(performance-optimizer)` | profiling/内存/算法 |
@@ -133,8 +135,8 @@
 |------|------|------|
 | TDD 指导 | `Agent(tdd-guide)` | 强制先测后码 |
 | **系统化调试** | `Skill(systematic-debugging)` | 遇到 bug 时先定位根因再修，不靠猜（对应 REPAIR 状态） |
-| **完成前自检** | `Skill(verification-before-completion)` | 声称完成前自查：测试真过了吗？边界覆盖了吗？文档同步了吗？ |
-| **执行计划** | `Skill(executing-plans)` | 在新会话中按已有 plan 逐步执行 |
+| **完成前自检** | `Skill(verification-before-completion)` | **铁律**：没在当前消息里跑过验证命令 = 不能声称通过。"应该能过" = 撒谎。证据先于断言 |
+| **执行计划** | `Skill(executing-plans)` | 在新会话中按已有 plan 逐步执行（无 subagent 支持时用；有 subagent 优先用 SDD） |
 | **分支收尾** | `Skill(finishing-a-development-branch)` | 实现完成、测试全过后，决定分支去向（合并/PR/归档） |
 | E2E 测试 | `Agent(e2e-runner)` 或 `Skill(e2e-testing)` | 关键用户流 |
 | PR 测试分析 | `Agent(pr-test-analyzer)` | 行为覆盖评审 |
