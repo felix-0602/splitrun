@@ -4,7 +4,7 @@
 > **更新频率**：每个 milestone 完成后更新进度；Reality Scan 在计划制定前更新。
 > **读者**：AI（自治执行）+ 人（验收复盘）。
 > **每个项目一份**：本文件是模板。新项目拷贝到 `<项目>/.claude/DEEPSHIP/Plan.md`。
-> `checks/` 目录用于存放临时验证脚本，跑完即删。
+> `.claude/DEEPSHIP/checks/` 目录用于存放项目**临时验证脚本**——写、跑、验证、删。不复用的不进测试套件，不累积历史遗物。约定详见 `implement/tools.md` A.3.1。
 
 ---
 

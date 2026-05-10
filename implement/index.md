@@ -10,7 +10,7 @@
 | 了解怎么写代码 | `code-style.md` | B. 代码规范（不可变性、命名、模块设计、DOM 脚本） |
 | 改动前做安全自检 | `safety.md` | C. 安全约束 + E. Effort Level |
 | 理解状态机怎么运转 | `state-machine.md` | D. 状态机 + 沟通（Heartbeat、Help Gradient、交付总结） |
-| 常用速查 | `appendix.md` | 五件套、失败处理矩阵、测试策略默认值 |
+| 常用速查 | `appendix.md` | 五件套、失败处理矩阵、测试策略、checks 临时脚本约定 |
 
 ## 优先级
 

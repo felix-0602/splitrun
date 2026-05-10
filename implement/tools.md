@@ -84,6 +84,17 @@
 | Spring Boot 测试 | `Skill(springboot-tdd)` | JUnit 5 + Mockito |
 | Laravel 测试 | `Skill(laravel-tdd)` | PHPUnit + Pest |
 
+#### checks/ 临时验证脚本约定
+
+项目 `.claude/DEEPSHIP/checks/` 目录用于存放**一次性验证脚本**：
+
+- **用途**：项目特有的临时检查——API 响应字段验证、HTML fixture 结构确认、跨文件引用完整性检查等
+- **生命周期**：写完 → 跑通 → 验证结果 → **删除**。不累积历史遗物
+- **如果复用了**：说明它不该在 checks/ 里——移入项目正式测试套件
+- **不可替代**：checks/ 是临时脚本区，不是测试框架的替代品。正式测试用 A.3.1 中的对应框架
+
+与全局 `checks/verify.py` 的区别：全局的是 DEEPSHIP **框架自检**（模板污染、状态机漂移、文件大小），项目级的 checks/ 是**该项目的一次性验证脚本**。
+
 #### A.3.2 语言专精审查 Agent
 
 | 语言 | Reviewer Agent | Build Resolver Agent |
