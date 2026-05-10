@@ -23,33 +23,38 @@ def sections(text):
     """Return set of section headings (## X, ### X.Y, #### X.Y.Z)."""
     return set(re.findall(r'^(#{2,4})\s+(.+)$', text, re.MULTILINE))
 
-def all_states_from_implement():
-    """Extract state names from Implement.md D.1 state machine table."""
-    impl = read(ROOT / "Implement.md")
-    # States appear as `READ_CONTEXT`, `CLARIFY_INTENT`, etc. in the D.1 table
-    # Look for the D.1 section and extract backtick-quoted states
+def all_states_from_state_machine():
+    """Extract state names from implement/state-machine.md D.1 table."""
+    path = ROOT / "implement" / "state-machine.md"
+    if not path.exists():
+        return set()
+    impl = read(path)
     d1_start = impl.find("### D.1")
     if d1_start == -1:
         return set()
-    # Scan to end of D.1 (next ## section)
     d1_end = impl.find("\n## ", d1_start + 100)
     if d1_end == -1:
         d1_end = len(impl)
     d1 = impl[d1_start:d1_end]
     states = set(re.findall(r'`([A-Z_]+)`', d1))
-    # Known state names (both SCREAMING_SNAKE_CASE and single-word ALLCAPS)
     known_states = {'READ_CONTEXT', 'CLARIFY_INTENT', 'MAP_REALITY',
                     'SELECT_MILESTONE', 'PLAN_STEP', 'EXECUTE',
                     'VALIDATE', 'REPAIR', 'RECORD', 'ADVANCE', 'BLOCK'}
     return {s for s in states if s in known_states}
 
+def read_all_implement():
+    """Read all implement/ files concatenated (for cross-reference checking)."""
+    impl_dir = ROOT / "implement"
+    texts = []
+    for path in sorted(impl_dir.rglob("*.md")):
+        texts.append(read(path))
+    return "\n".join(texts)
+
 # ─── check 1: cross-file references ───
 def check_cross_refs():
     print("\n[1] Cross-file references")
-    impl = read(ROOT / "Implement.md")
-    # Find patterns like "见 C.2.1", "见 §C.2", "见 D.6.6"
+    impl = read_all_implement()
     refs = re.findall(r'见\s+(§?[A-Z]\.\d+(?:\.\d+)?)', impl)
-    # Also find "（见 X.Y）"
     refs += re.findall(r'（见\s+([A-Z]\.\d+(?:\.\d+)?)', impl)
 
     secs = sections(impl)
@@ -64,26 +69,25 @@ def check_cross_refs():
                 found = True
                 break
         if not found:
-            # Try fuzzy: C.2.1 should match "C.2.1 契约同步"
             pattern = ref.lstrip('§')
             if any(pattern in title for _, title in secs):
                 found = True
         if found:
             ok(f"ref '{ref}' → exists")
         else:
-            err(f"ref '{ref}' → NOT FOUND in Implement.md")
+            err(f"ref '{ref}' → NOT FOUND in implement/")
     if checked == 0:
         ok("no cross-refs to check")
     return checked
 
 # ─── check 2: state machine consistency ───
 def check_state_machine():
-    print("\n[2] State machine consistency (README vs Implement.md D.1)")
-    states = all_states_from_implement()
+    print("\n[2] State machine consistency (README vs state-machine.md D.1)")
+    states = all_states_from_state_machine()
     readme_text = read(ROOT / "README.md")
 
     if not states:
-        err("could not extract states from Implement.md D.1")
+        err("could not extract states from implement/state-machine.md D.1")
         return
 
     print(f"  States in D.1: {sorted(states)}")
