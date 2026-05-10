@@ -1,243 +1,146 @@
 # Plan.md — Milestone 切片与执行计划
 
-> **用途**：把 Prompt.md 的目标拆成可独立验证的 milestone，每个有明确的 AC 和验证命令。
-> **更新频率**：项目开始时生成全量计划；每个 milestone 开始前可细化；完成时标记。
-> **原则**：每个 milestone 1-3 天可完成，太大就继续拆。
+> Netclass Sidekick U 校园 Adapter · Phase 1 Week 2
+
+---
+
+## Project Reality Scan
+
+| 项 | 当前事实 | 证据位置 | 影响 |
+|----|----------|----------|------|
+| 用户入口 | `uai.unipus.cn` → 课程 → 教程学习/作业 | browser snapshot 2026-05-09 | 脚本需 `@match` 这两个域名 |
+| 内容入口 | 点击练习跳转到 `ucontent.unipus.cn` | URL 路由实测 | 跨域但在同一浏览器会话，Tampermonkey 可覆盖 |
+| 当前调用链路 | DOM 提取 → 无（adapter 为空占位） | `client/src/adapters/unipus.ts:14` | 从零搭建 |
+| 题目容器 | `.question-common-abs-question-container` | browser js 实测 | 主 selector |
+| 填空输入 | `.comp-abs-input > input` | browser js 实测 | fill 类型答案填入 |
+| 音频元素 | `<audio class="unipus-audio-h5">` src CDN + URL hash 含 duration | browser js 实测 | 听力题需下载音频送 Whisper |
+| 时长追踪 | 学习记录页：必修学习时长/进度/得分 per unit | browser text 实测 | 验证指标 |
+| 活跃度检测 | 鼠标/键盘长时间无操作暂停计时 | recon report | time-padder 需模拟 mousemove |
+| 既有断点 | adapter 全为空占位；time-padder 也是占位；无 U 校园测试 | `unipus.ts`, `unipus-video.ts` | 从头实现 |
 
 ---
 
 ## Milestone 依赖图
 
-> 项目开始时自动生成。用 ASCII 表示依赖关系。
-
 ```
-M0: 项目脚手架 & 基础设施
+M1: U校园题目提取 + 答案填入（填空/选择）
  |
- +---> M1: [第一组功能]
- |       |
- |       +---> M2: [第二组功能]
+ +---> M2: U校园 time-padder（音频视频自动播放 + 活跃度模拟）
  |
- +---> M3: [并行功能组]
- |
- +---> M4: 集成 & 收尾
+ +---> M3: U校园集成验证 + E2E
 ```
 
 ---
 
-## Project Reality Scan（计划前必做）
+## M1: U校园题目提取 + 答案填入
 
-> 在拆 milestone 前完成。必须来自代码搜索、文件阅读、运行结果或用户提供的事实；不要只写推测。
-
-| 项 | 当前事实 | 证据位置 | 影响 |
-|----|----------|----------|------|
-| 用户入口 | [页面/组件/命令/快捷键/API] | [文件路径/命令/截图] | [对目标的影响] |
-| 当前调用链路 | [entry -> client -> endpoint -> service -> state/render] | [文件路径/函数名] | |
-| 当前 API/契约 | [endpoint、request、response] | [文件路径/测试] | |
-| 目标 API/契约 | [endpoint、request、response] | [spec/后端实现/用户要求] | |
-| 契约差异 | [新增/删除/语义变化字段] | [diff/类型/schema] | |
-| 前端/调用方消费字段 | [实际读取哪些字段] | [组件/状态管理/渲染位置] | |
-| 后端已有能力 | [已实现 endpoint/service/tool] | [文件/测试] | |
-| 管理/运营入口 | [admin/CLI/后台/API 是否存在] | [文件/路由] | |
-| 文档现状 | [README/API docs/配置说明/用户手册/架构说明是否存在] | [文件路径] | |
-| 版本现状 | [package/app version/tag/changelog/release notes 当前状态] | [文件路径/git 命令] | |
-| 既有断点 | [不是本轮造成但阻止目标达成的问题] | [证据] | |
-| 未知项 | [无法确认的信息] | [为什么无法确认] | [是否 BLOCK] |
-
-### Reality Scan Checklist
-
-- [ ] 用搜索确认用户入口和真实调用链路。
-- [ ] 对比当前接口和目标接口的 request/response 契约。
-- [ ] 确认调用方实际消费字段，而不是只看后端返回字段。
-- [ ] 列出端到端目标路径上的既有断点。
-- [ ] 将断点转化为 milestone、已知问题或明确的 non-goal。
-- [ ] 确认可维护的文档位置和版本记录位置。
-- [ ] 明确本项目版本策略：无版本、SemVer、日期版本、内部 build 号或 git tag。
-- [ ] 如果关键链路无法确认，进入 `BLOCK` 或要求用户补充。
-
----
-
-## Milestone 模板
-
-每个 milestone 按以下格式编写。`[ ]` checkbox 在完成时标记为 `[x]`。
-
----
-
-## M0: 项目脚手架 & 基础设施
-
-- **目标**：[一句话]
-- **依赖**：无
-- **建议 Effort**：`medium`
-- **预估文件数**：~N 个
-- **主导质量维度**：🏗 Architecture
-- **质量门禁**：[本 milestone 最重要的真实风险，例如权限、数据一致性、性能、可观察性]
-- **文档影响**：[README/API/用户手册/架构/配置/无]
-- **版本影响**：[none/patch/minor/major/date/build]，[原因]
-
-### Acceptance Criteria
-- [ ] AC1: [可观测的验收条件]
-- [ ] AC2: [可观测的验收条件]
-
-### Reality Links
-- **覆盖的用户入口/链路**：[来自 Project Reality Scan 的具体链路]
-- **修复的既有断点**：[断点 ID 或“无”]
-- **不覆盖的相关断点**：[留到后续 milestone 或 non-goal]
-
-### Real Acceptance Scenarios
-- [ ] [从用户/API/系统边界出发的真实验收场景，不只验证内部字段存在]
-
-### Validation Commands
-```bash
-# 先识别项目类型，再选择适用命令；不要把不适用的示例当成硬命令
-# Node: npm install && npm run build && npm test
-# Python: pip install -r requirements.txt && python -m pytest
-# Rust: cargo build && cargo test
-# Go: go test ./...
-
-# Lint / Type Check / Build
-# 使用项目实际脚本，例如 npm run lint、npx tsc --noEmit、ruff check、mypy、cargo clippy
-
-# 运行与健康检查
-# 启动项目实际 dev/server 命令，并访问 health endpoint 或等效 smoke check
-```
-
-### Documentation & Version Tasks
-- [ ] 更新受影响文档，或明确说明无文档影响。
-- [ ] 更新版本记录 / changelog / release notes，或明确说明无版本影响。
-
-### Residual Risks
-- [ ] [即使验证通过仍然存在的风险；没有则写“无已知剩余风险”]
-
----
-
-## M1: [功能组名称]
-
-- **目标**：[一句话]
-- **依赖**：M0
+- **目标**：脚本能在 U 校园练习页自动提取题目 DOM，填答案，提交
+- **依赖**：无（已有超星 adapter 的 answer/fill 模块可复用）
 - **建议 Effort**：`high`
-- **预估文件数**：~N 个
-- **主导质量维度**：[选一个]
-- **质量门禁**：[本 milestone 最重要的真实风险]
-- **文档影响**：[README/API/用户手册/架构/配置/无]
-- **版本影响**：[none/patch/minor/major/date/build]，[原因]
+- **预估文件数**：~4 个（adapter 重写 + filler 适配 + types + 测试）
+- **主导质量维度**：🧩 Module Depth
+- **质量门禁**：extract → answer → fill 链路在 fixture HTML 上跑通
+- **文档影响**：更新 docs/ARCHITECTURE.md 的模块边界表
+- **版本影响**：minor（新增 adapter，不影响现有超星行为）
 
 ### Acceptance Criteria
-- [ ] AC1:
-- [ ] AC2:
+- [ ] AC1: `extractQuestionsFromUnipus()` 从 fixture HTML 提取题目：题干 + 选项 + 题型 + 音频 URL
+- [ ] AC2: `createFiller()` 能填入 `.comp-abs-input > input` 的填空答案
+- [ ] AC3: 适配 `fill/choice.ts` 到 U 校园选择题 DOM（若存在）
+- [ ] AC4: `router.ts` 在 `ucontent.unipus.cn` 域名下触发 unipus adapter
 
 ### Reality Links
-- **覆盖的用户入口/链路**：
-- **修复的既有断点**：
-- **不覆盖的相关断点**：
+- **覆盖的用户入口/链路**：ucontent 练习页 → extract → /answer API → fill DOM
+- **修复的既有断点**：`unipus.ts` 空占位 → 实装
+- **不覆盖的相关断点**：听力 Whisper STT（留 Phase 2）；视频刷时长（留 M2）
 
 ### Real Acceptance Scenarios
-- [ ] [真实用户/API/系统边界场景]
+- [ ] 用 Playwright 加载 `test/fixtures/unipus-listening-fill.json` fixture，extract 成功出 ≥1 道题
+- [ ] 模拟 /answer hit 返回答案，filler 正确填入 input
 
 ### Validation Commands
 ```bash
-# 具体到这个 milestone 的验证命令
+cd server && npx tsc --noEmit && npx vitest run
+cd client && npx tsc --noEmit && npx vitest run
 ```
 
 ### Documentation & Version Tasks
-- [ ] 更新受影响文档，或明确说明无文档影响。
-- [ ] 更新版本记录 / changelog / release notes，或明确说明无版本影响。
+- [ ] 更新 `docs/ARCHITECTURE.md` 模块边界表 unipus adapter 状态
+- [ ] bump client version minor
 
 ### Residual Risks
-- [ ] [剩余风险或“无已知剩余风险”]
+- [ ] 听力题自动答题依赖 Whisper（Phase 2），当前仅提取音频 URL
+- [ ] 选择题 DOM 未经实测确认（所有已完成课程都是填空），需等新用户遇到选择题时补 adapter
 
 ---
 
-## M2: [功能组名称]
+## M2: U校园 time-padder（音频视频自动播放 + 活跃度模拟）
 
-- **目标**：[一句话]
+- **目标**：自动播放音频/视频，模拟活跃度防检测，刷满必修学习时长
 - **依赖**：M1
-- **建议 Effort**：`high`
-- **预估文件数**：~N 个
-- **主导质量维度**：[选一个]
-- **质量门禁**：[本 milestone 最重要的真实风险]
-- **文档影响**：[README/API/用户手册/架构/配置/无]
-- **版本影响**：[none/patch/minor/major/date/build]，[原因]
+- **建议 Effort**：`medium`
+- **预估文件数**：~2 个（unipus-video 重写 + 测试）
+- **主导质量维度**：🎨 UX
+- **质量门禁**：video/audio hook + mousemove 模拟在 fixture 上可验证
+- **文档影响**：无
+- **版本影响**：patch
 
 ### Acceptance Criteria
-- [ ] AC1:
-- [ ] AC2:
+- [ ] AC1: 检测 `<audio>` / `<video>` 元素自动 play + muted + 播放速率
+- [ ] AC2: 每 3min ±30s 模拟 mousemove 防活跃度检测
+- [ ] AC3: 学习记录页显示学习时长增长（验证指标）
 
 ### Reality Links
-- **覆盖的用户入口/链路**：
-- **修复的既有断点**：
-- **不覆盖的相关断点**：
+- **覆盖的用户入口/链路**：教程学习 → 视频/音频任务 → time-padder hook
+- **修复的既有断点**：`unipus-video.ts` 空占位 → 基本实现
+- **不覆盖的相关断点**：React state 深层 hook（暂用 DOM 级 play/pause 操作）
 
 ### Real Acceptance Scenarios
-- [ ] [真实用户/API/系统边界场景]
+- [ ] U 校园视频页加载后 audio/video 自动播放
+- [ ] 3 分钟后验证 mousemove 事件已派发
 
 ### Validation Commands
 ```bash
+cd client && npx vitest run
 ```
 
 ### Documentation & Version Tasks
-- [ ] 更新受影响文档，或明确说明无文档影响。
-- [ ] 更新版本记录 / changelog / release notes，或明确说明无版本影响。
+- [ ] 无文档影响（内部实现）
+- [ ] bump client version patch
 
 ### Residual Risks
-- [ ] [剩余风险或“无已知剩余风险”]
+- [ ] 活跃度检测可能升级（需后续实地验证）
+- [ ] React state hook 更可靠但工程量更大（当前 DOM 级方案先跑通）
 
 ---
 
-## MX: 集成 & 收尾
+## M3: U校园集成验证 + E2E
 
-- **目标**：端到端集成验证、文档补全、部署准备
-- **依赖**：所有功能 milestone
-- **建议 Effort**：`max`
+- **目标**：端到端验证 + fixture 补充 + 已知问题收口
+- **依赖**：M2
+- **建议 Effort**：`medium`
+- **预估文件数**：~2 个
 - **主导质量维度**：🔭 Observability
-- **质量门禁**：全部关键路径在真实或等效环境下可复现验证，评估 PASS 不能替代端到端验收
-- **文档影响**：README、运行/部署说明、API/用户入口说明、已知风险必须收口
-- **版本影响**：[patch/minor/major/date/build]，按本次 release 范围决定
+- **质量门禁**：全量测试绿 + E2E fixture 回归
+- **文档影响**：更新 CHANGELOG
+- **版本影响**：minor（U校园支持正式发布）
 
 ### Acceptance Criteria
-- [ ] 所有 Prompt.md 里的 Done When 条件全部满足
-- [ ] E2E 测试覆盖关键用户流程
-- [ ] README 有完整的运行/部署指令
-- [ ] 在干净环境从头跑过一次完整验证
-
-### Reality Links
-- **覆盖的用户入口/链路**：Project Reality Scan 中所有主链路
-- **修复的既有断点**：所有影响 Done When 的断点
-- **不覆盖的相关断点**：必须已记录为 non-goal 或已知风险
-
-### Real Acceptance Scenarios
-- [ ] 从空环境启动项目并完成至少一条端到端核心流程
-- [ ] 失败路径、权限边界、外部依赖不可用时有可观测错误和恢复策略
+- [ ] AC1: 全量 client + server 测试绿
+- [ ] AC2: 至少 1 条 U 校园 E2E fixture 回归
+- [ ] AC3: CHANGELOG 记录 U 校园支持
 
 ### Validation Commands
 ```bash
-# 全量验证：使用项目实际脚本
-# 1. install/build/lint/typecheck
-# 2. unit + integration tests
-# 3. E2E/visual tests（仅在项目有关键用户流或前端风险时强制）
-# 4. coverage check（阈值以 Prompt.md 或本 milestone 显式要求为准）
-# 5. clean environment smoke test
+cd server && npx vitest run && cd ../client && npx vitest run
 ```
-
-### Documentation & Version Tasks
-- [ ] README/运行说明/API 契约/用户入口说明与实际行为一致。
-- [ ] changelog/release notes 记录用户可见变化、破坏性变化、迁移步骤和剩余风险。
-- [ ] 版本号、tag 或 build 标识符合项目版本策略。
-
-### Residual Risks
-- [ ] [上线前仍需人工验收、外部服务验证或监控跟踪的风险]
 
 ---
 
 ## 进度总览
 
-| Milestone | 状态 | 开始 | 完成 | Effort |
-|-----------|------|------|------|--------|
-| M0 | ⬜ pending | — | — | medium |
-| M1 | ⬜ pending | — | — | high |
-| M2 | ⬜ pending | — | — | high |
-| MX | ⬜ pending | — | — | max |
-
-> 状态：⬜ pending → 🔄 in_progress → ✅ done → ❌ blocked
-
----
-
-> **AI 使用说明**：每次开始新的 milestone 前，更新状态为 🔄，完成后更新为 ✅ 并记录到 Documentation.md。如果某个 AC 验证反复失败，在 Documentation.md 的"已知问题"中记录，不要跳过。
+| Milestone | 状态 | Effort |
+|-----------|------|--------|
+| M1 | ⬜ pending | high |
+| M2 | ⬜ pending | medium |
+| M3 | ⬜ pending | medium |
