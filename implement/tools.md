@@ -88,12 +88,14 @@
 
 项目 `.claude/DEEPSHIP/checks/` 目录用于存放**一次性验证脚本**：
 
+- **隔离保证**：`.claude/` 整个目录在 `.gitignore` 里，checks/ 里的东西不进 git、不污染项目目录
 - **用途**：项目特有的临时检查——API 响应字段验证、HTML fixture 结构确认、跨文件引用完整性检查等
-- **生命周期**：写完 → 跑通 → 验证结果 → **删除**。不累积历史遗物
-- **如果复用了**：说明它不该在 checks/ 里——移入项目正式测试套件
-- **不可替代**：checks/ 是临时脚本区，不是测试框架的替代品。正式测试用 A.3.1 中的对应框架
+- **生命周期**：写 → 跑 → 验证 → **删**。不累积历史遗物
+- **永久 vs 临时**：项目级永久检查（如 verify.py）可以留存；临时脚本跑完即删
+- **如果复用了**：不该在 checks/——移入项目正式测试套件
+- **样例**：`.claude/DEEPSHIP/checks/sample-api-check.py`
 
-`.claude/DEEPSHIP/checks/verify.py` 是 DEEPSHIP **自身项目的 checks/**（吃狗粮），其他项目同理——每个项目自己的 checks/ 放自己的验证脚本。
+`.claude/DEEPSHIP/checks/verify.py` 是 DEEPSHIP **自身项目的 checks/**（吃狗粮），其他项目同理。
 
 #### A.3.2 语言专精审查 Agent
 
