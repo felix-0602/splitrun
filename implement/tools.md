@@ -93,7 +93,7 @@
 - **如果复用了**：说明它不该在 checks/ 里——移入项目正式测试套件
 - **不可替代**：checks/ 是临时脚本区，不是测试框架的替代品。正式测试用 A.3.1 中的对应框架
 
-与全局 `checks/verify.py` 的区别：全局的是 DEEPSHIP **框架自检**（模板污染、状态机漂移、文件大小），项目级的 checks/ 是**该项目的一次性验证脚本**。
+`.claude/DEEPSHIP/checks/verify.py` 是 DEEPSHIP **自身项目的 checks/**（吃狗粮），其他项目同理——每个项目自己的 checks/ 放自己的验证脚本。
 
 #### A.3.2 语言专精审查 Agent
 

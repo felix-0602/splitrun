@@ -265,7 +265,7 @@
 **模式**：改动完成后，不要等用户提醒——主动检查以下下游引用是否同步更新：
 1. `~/.claude/CLAUDE.md` — 索引表格和核心流程图
 2. `README.md` — 架构图、文件表、检查清单中的路径
-3. `checks/verify.py` — 硬编码的文件路径和扫描范围
+3. `.claude/DEEPSHIP/checks/verify.py` — 硬编码的文件路径和扫描范围
 4. 所有 `.md` 文件中的交叉引用（"见 X.Y"）——verify.py 只能检查同文件内的引用，跨文件的靠人工
 5. 版本记录（Documentation.md §4）— 记录破坏性变化
 
