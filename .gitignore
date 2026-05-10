@@ -1,8 +1,3 @@
-# DEEPSHIP — session artifacts (not version-controlled)
-DeepMemories/decisions/
-DeepMemories/sessions/
-DeepMemories/approvals/
-
 # Local Claude Code settings (per-machine, not versioned)
 .claude/
 
