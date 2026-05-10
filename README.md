@@ -13,11 +13,13 @@
 
 ## 核心流程
 
+> 权威源：`implement/state-machine.md` D.1。本图为其简化视图。
+
 ```
 READ_CONTEXT
   → CLARIFY_INTENT（目标模糊时触发，否则跳过）
   → MAP_REALITY → SELECT_MILESTONE → PLAN_STEP
-  → EXECUTE（含 TDD 内循环 + 并行子代理分派）
+  → EXECUTE（含 TDD + SDD 审查门 + 并行分派）
   → VALIDATE → RECORD → ADVANCE | REPAIR | BLOCK
 ```
 

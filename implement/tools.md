@@ -12,13 +12,14 @@
 
 ### A.0 状态→工具速查矩阵
 
-> 每个 D.1 状态机的状态对应哪些工具。**这是建议而非铁律**——如果当前任务的实际情况跟典型场景不同，用自己的判断。此表优先级为 D.0 第 7 级（工具建议），不覆盖用户指令、安全规则或项目约束。
+> 每个 D.1 状态机的状态对应哪些工具。状态定义以 `state-machine.md` D.1 为权威源，本表为工具映射（派生）。**这是建议而非铁律**——如果当前任务的实际情况跟典型场景不同，用自己的判断。此表优先级为 D.0 第 7 级（工具建议），不覆盖用户指令、安全规则或项目约束。
 
 | 当前状态 | 首选工具 | 何时跳过 | 关键判断 |
 |----------|----------|----------|----------|
 | `READ_CONTEXT` | `Read(Prompt.md)`, `Read(Plan.md)`, `Read(Documentation.md)` | —（不跳） | 能说出当前 milestone 是什么、硬约束有哪些 |
 | `CLARIFY_INTENT` | `Skill(brainstorming)` | 目标已有可观测行为描述时跳过整个状态 | 目标模糊→追问；目标清晰→直接进入 MAP_REALITY |
 | `MAP_REALITY` | `Grep`, `Glob`, `Read`, `Agent(code-explorer)` | 小改动且入口/链路已确凿时简化为单次 Grep | 必须确认：用户入口、调用链路、既有断点 |
+| `SELECT_MILESTONE` | 读 Plan.md 进度表 + Documentation.md 当前状态 | 无可选 milestone 时触发 BLOCK | 选择第一个未完成且依赖满足的 milestone |
 | `PLAN_STEP` | `Skill(writing-plans)`, `Agent(planner)`, `EnterPlanMode` | <3 文件且无架构影响时直接列步骤 | >5 文件或 schema 变更 → 强制 EnterPlanMode |
 | `EXECUTE` — 单任务 | `Skill(test-driven-development)` + 语言专精 agent（见 A.3.2） | 改动 < 3 文件且逻辑简单时直接写 | 先写测试（RED）→ 最小实现（GREEN）→ 重构 |
 | `EXECUTE` — 多任务串行 | `Skill(subagent-driven-development)` | 单文件简单改动时不用 SDD | 任务互不依赖但不能并行（共享状态）→ 每任务走 SDD 两级审查（Spec → Quality） |
