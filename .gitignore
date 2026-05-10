@@ -3,6 +3,9 @@ DeepMemories/decisions/
 DeepMemories/sessions/
 DeepMemories/approvals/
 
+# Local Claude Code settings (per-machine, not versioned)
+.claude/settings.local.json
+
 # OS files
 .DS_Store
 Thumbs.db
