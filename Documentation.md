@@ -15,7 +15,7 @@
 | 状态 | [pending / in_progress / done] |
 | 整体完成率 | [大概百分比或描述] |
 | 上次更新 | [YYYY-MM-DD HH:mm] |
-| 框架版本 | [如 DEEPSHIP v1.2] |
+| 框架版本 | DEEPSHIP v2.1（JIT 规则架构） |
 
 ---
 
@@ -25,6 +25,8 @@
 
 | 日期 | 决策 | 原因 | 替代方案 |
 |------|------|------|----------|
+| 2026-05-11 | **JIT 规则加载架构**：implement/ 6 文件 ~1200 行全量加载 → 拆为 `core/manifest.md`（~50行常驻）+ `rules/states/`（11 个状态检查表，每个 30-50 行）+ `rules/static/`（2 个稳定规则文件）。implement/ 保留为归档参考 | 症状：文档漂移（36aba2d）、规则弹性分级被迫手动切（36aba2d）、事后补规则（78e943f）——三个症状共同指向"单体静态 Prompt 的 Lost in the Middle + Attention Delusion"。Library 方案（309→59 skills）只解决技能数量问题，未解决规则被忽略问题。启发自大模型架构优化五层模型（L1 意图路由 / L2 技能 RAG / L3 动态组装 / L4 分身代理 / L5 底层缓存），本次实现 L3（动态组装）+ L5（静态层缓存），L4 保持 Superpowers 多会话并行方案 | 保持旧架构：继续叠加规则补丁，依赖 verify.py 兜底（成本递增）；激进重写：删除 implement/ 全部重建（风险过高，失去详细参考） |
+| 2026-05-11 | **Codex review 修复（7 项 P1/P2）**：README 重写为 JIT 架构；verify.py 移出 `.claude/`（修复可移植性）+ 关键工具缺失从 WARN→FAIL；CLARIFY_INTENT optional 语义修正（+ skipped_with_reason）；硬约束改为 tier-aware 执行表；工具可用性分级（必装/推荐/可选）；状态审计字段（state_entered/rule_file_read/exit_condition_met） | review 发现 README 仍描述 v1.4 旧架构（抵消本次优化）；verify.py 被 .gitignore 排除且 WARN→PASS 掩盖关键工具缺失；JIT 只有声明无机制保证；CLARIFY_INTENT optional 与 PLAN_STEP 硬门禁冲突；铁律与弹性分级打架；工具索引存在"概念工具"可能诱发调用不存在的能力 | 不修：继续使用被 .gitignore 排除的 verify.py（可移植性断裂）；激进审计方案：每个状态强制写独立审计文件（过度工程） |
 | 2026-05-08 | 引入"模块深度"质量维度与接口优先设计规则（Implement.md B.8, Prompt.md §7） | 模块的第一性原理是可测试性：接口是测试面，浅模块集群让 bug 埋在实现细节里，接缝只在有 ≥2 个适配器时才成立。源自 Matt Pocock skills 工程实践 | 不引入：DEEPSHIP 只停留在项目管理层，不进入代码结构层 |
 | 2026-05-08 | D.6/D.7 重写为 Heartbeat + Mode Word + Help Gradient 自然沟通系统；D.2 从 14 条精简为 5 个阻塞模式；Documentation §7 从 16 字段简化为 5 字段 | 原有合规检查清单式的汇报机制产生压力而非产生信任——规则变成了"向用户证明你在工作"。新系统基于自然对话节奏，heartbeat 就是进度，求助梯度在 BLOCK 之前提供了更轻量的求助方式 | 保留旧版：叠加更多汇报模板和合规字段 |
 | 2026-05-10 | 将 Superpowers（obra/superpowers v5.1.0）和 Ralph（snarktank/ralph）的核心设计融入 DEEPSHIP 框架 | Superpowers 的 brainstorming、TDD 内循环、subagent-driven-development、两级审查和 Ralph 的模式沉淀机制填补了 DEEPSHIP 的关键空白：需求澄清、测试前置、并行执行、人类协作和知识固化。全部改动以融合而非替换方式完成——Superpowers 作为工具索引中的可用技能，DEEPSHIP 状态机作为执行框架 | 不融合：DEEPSHIP 和 Superpowers 各自独立使用，用户需要在两个系统间手动切换 |
@@ -88,6 +90,7 @@
 
 | 时间 | Milestone | 版本变化 | 变更类型 | 用户可见变化 | 契约/迁移影响 | 文档更新 | 验证 |
 |------|-----------|----------|----------|--------------|--------------|----------|------|
+| 2026-05-11 | **JIT 规则架构** | minor | architecture | **核心变更**：implement/ 6文件~1200行全量加载 → `core/manifest.md`（~50行常驻）+ `rules/states/`（11个状态检查表，每文件30-50行）+ `rules/static/`（2个稳定规则文件）。implement/ 保留为归档参考。CLAUDE.md DeepShip 段从 12 行精简为指向 core/manifest.md 的索引 | **规则加载方式完全变化**：旧流程"启动时全量读 implement/"→ 新流程"每状态进入时 JIT Read rules/states/。implement/index.md 更新为归档说明 | CLAUDE.md, Documentation.md, implement/index.md + 新增 core/manifest.md, rules/states/* (11文件), rules/static/* (2文件) | 人工 review |
 | 2026-05-08 19:00 | 框架演进 | minor | refactor | B.8 深度模块与接口设计 + 逃逸出口；D.6/D.7 重写为自然沟通系统；D.2 精简为 5 阻塞模式；Documentation §7 简化 | 无破坏性变化 | Implement.md, Prompt.md, Documentation.md | 人工 review |
 | 2026-05-10 18:00 | Superpowers 融合 | minor | feature | +CLARIFY_INTENT 状态（需求澄清）；+TDD 内循环 + 并行子代理分派；Heartbeat 升级为 commit 风格实时报备；+D.6.6 交付总结；A.5 审查分 AI 自审/人类审查两层；工具索引新增 15 个 Superpowers+Ralph 技能；+§11 代码模式沉淀区 | 无破坏性变化 | Implement.md, Documentation.md | 人工 review |
 | 2026-05-10 | 契约同步 + 项目隔离 + 自验证 | minor | feature | C.2.1 契约同步 ≠ 扩 Diff；Prompt §6 契约同步原则；C.1 新增契约检查+ReAct 自省（code-reviewer/verify.py）；VALIDATE 嵌入架构自省；项目实例架构（`.claude/DEEPSHIP/`）；checks/verify.py 自验证脚本 | 项目实例路径变化：`<项目>/DEEPSHIP/` → `<项目>/.claude/DEEPSHIP/` | Implement.md, Prompt.md, README.md, Documentation.md + 新增 .claude/DEEPSHIP/*, checks/verify.py | verify.py 4 检查中 3 PASS（Implement.md 918 行留 M2） |
@@ -265,7 +268,7 @@
 **模式**：改动完成后，不要等用户提醒——主动检查以下下游引用是否同步更新：
 1. `~/.claude/CLAUDE.md` — 索引表格和核心流程图
 2. `README.md` — 架构图、文件表、检查清单中的路径
-3. `.claude/DEEPSHIP/checks/verify.py` — 硬编码的文件路径和扫描范围
+3. `checks/verify.py` — 硬编码的文件路径和扫描范围
 4. 所有 `.md` 文件中的交叉引用（"见 X.Y"）——verify.py 只能检查同文件内的引用，跨文件的靠人工
 5. 版本记录（Documentation.md §4）— 记录破坏性变化
 

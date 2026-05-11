@@ -96,7 +96,7 @@
 - **如果复用了**：不该在 checks/——移入项目正式测试套件
 - **样例**：`.claude/DEEPSHIP/checks/sample-api-check.py`
 
-`.claude/DEEPSHIP/checks/verify.py` 是 DEEPSHIP **自身项目的 checks/**（吃狗粮），其他项目同理。
+`checks/verify.py`（仓库根目录）是 DEEPSHIP 框架自验证脚本。项目实例的临时验证脚本放在 `<项目>/.claude/DEEPSHIP/checks/`。
 
 #### A.3.2 语言专精审查 Agent
 
