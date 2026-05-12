@@ -30,7 +30,13 @@
   - [产品级问题，不能代你判断；无则写"无"]
 ```
 
-## 完成后
+## 完成后（可恢复分段自治 — 条件推进）
 
-- [ ] 标记 milestone 完成
-- [ ] 进入下一轮 READ_CONTEXT
+- [ ] 标记当前 milestone / work unit 完成
+- [ ] 检查 `.deepship/work_units.json`：是否有非终态 WU？
+  - `pending` / `in_progress` → 进入下一轮 READ_CONTEXT（依赖满足时）
+  - `done`（子代理返回但未集成）→ 必须先集成（RECORD），禁止直接 ADVANCE
+  - `blocked` / `failed` → 先处理阻塞或回 PLAN_STEP 重新拆解
+  - 全部 `integrated` + 有 pending milestone → SELECT_MILESTONE
+  - 全部 `integrated` + 无 pending milestone → `COMPLETE`
+- [ ] **禁止**在无任务时自动进入 READ_CONTEXT（空转）

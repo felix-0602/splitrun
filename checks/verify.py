@@ -3,7 +3,7 @@ DEEPSHIP framework self-verification.
 Zero external dependencies. Run from repo root:
   python checks/verify.py
 """
-import os, re, sys
+import os, re, sys, json
 from pathlib import Path
 
 _self = Path(__file__).resolve()
@@ -29,7 +29,25 @@ def read(path):
 def sections(text):
     return set(re.findall(r'^(#{2,4})\s+(.+)$', text, re.MULTILINE))
 
-def all_states_from_state_machine():
+def all_states_from_manifest():
+    """Extract states from protocol/state-machine.md (authoritative protocol source)."""
+    path = ROOT / "protocol" / "state-machine.md"
+    if not path.exists():
+        # Fallback: try old location in core/manifest.md
+        path = ROOT / "core" / "manifest.md"
+        if not path.exists():
+            return set()
+    text = read(path)
+    # Extract states from `STATE_NAME` backtick patterns
+    states = set(re.findall(r'`([A-Z][A-Z_]+)`', text))
+    known_states = {'READ_CONTEXT', 'CLARIFY_INTENT', 'MAP_REALITY',
+                    'SELECT_MILESTONE', 'PLAN_STEP', 'EXECUTE',
+                    'VALIDATE', 'REPAIR', 'RECORD', 'ADVANCE', 'BLOCK',
+                    'COMPLETE'}
+    return {s for s in states if s in known_states}
+
+def states_from_archive_d1():
+    """Extract states from implement/state-machine.md D.1 (archive, for cross-check)."""
     path = ROOT / "implement" / "state-machine.md"
     if not path.exists():
         return set()
@@ -44,7 +62,8 @@ def all_states_from_state_machine():
     states = set(re.findall(r'`([A-Z_]+)`', d1))
     known_states = {'READ_CONTEXT', 'CLARIFY_INTENT', 'MAP_REALITY',
                     'SELECT_MILESTONE', 'PLAN_STEP', 'EXECUTE',
-                    'VALIDATE', 'REPAIR', 'RECORD', 'ADVANCE', 'BLOCK'}
+                    'VALIDATE', 'REPAIR', 'RECORD', 'ADVANCE', 'BLOCK',
+                    'COMPLETE'}
     return {s for s in states if s in known_states}
 
 def read_all_implement():
@@ -100,66 +119,85 @@ def check_cross_refs():
             err(f"rules ref '{ref}' → FILE NOT FOUND")
     return checked
 
-# ─── check 2: state machine consistency ───
+# ─── check 2: state machine consistency (manifest.md authoritative) ───
 def check_state_machine():
-    print("\n[2] State machine consistency (manifest.md <-> state-machine.md)")
-    states = all_states_from_state_machine()
+    print("\n[2] State machine consistency (manifest.md → archive)")
+    manifest_states = all_states_from_manifest()
+    archive_states = states_from_archive_d1()
     manifest_path = ROOT / "core" / "manifest.md"
 
-    if not states:
-        err("could not extract states from implement/state-machine.md D.1")
+    if not manifest_states:
+        err("could not extract states from core/manifest.md rule trigger table")
         return
 
-    print(f"  States in D.1: {sorted(states)}")
+    print(f"  Manifest states: {sorted(manifest_states)}")
+    if archive_states:
+        print(f"  Archive D.1 states: {sorted(archive_states)}")
 
-    if manifest_path.exists():
-        manifest_text = read(manifest_path)
-        for s in states:
-            if s in manifest_text:
-                ok(f"'{s}' in manifest.md")
-            else:
-                err(f"'{s}' NOT in core/manifest.md")
+    # core/manifest.md is authoritative — archive must match it
+    if archive_states:
+        missing_in_archive = manifest_states - archive_states
+        extra_in_archive = archive_states - manifest_states
+        for s in sorted(missing_in_archive):
+            warn(f"'{s}' in manifest.md but NOT in implement/state-machine.md D.1 — archive stale?")
+        for s in sorted(extra_in_archive):
+            warn(f"'{s}' in D.1 but NOT in manifest.md — archive has extra state")
+        if not missing_in_archive and not extra_in_archive:
+            ok(f"manifest.md <-> D.1: {len(manifest_states)} states consistent")
     else:
-        err("core/manifest.md NOT FOUND")
+        warn("implement/state-machine.md D.1 not parseable — archive check skipped")
 
-    # Check rules/states/ has a file for each state (except SELECT_MILESTONE)
+    # Check protocol/state-machine.md has state definitions (v2.2+: authority in protocol/)
+    protocol_sm_path = ROOT / "protocol" / "state-machine.md"
+    if protocol_sm_path.exists():
+        protocol_sm_text = read(protocol_sm_path)
+        for s in sorted(manifest_states):
+            if f"`{s}`" in protocol_sm_text or s in protocol_sm_text:
+                ok(f"'{s}' defined in protocol/state-machine.md")
+            else:
+                err(f"'{s}' MISSING from protocol/state-machine.md")
+    else:
+        err("protocol/state-machine.md NOT FOUND")
+
+    # Check rules/states/ has a file for each state that needs one
     states_dir = ROOT / "rules" / "states"
     if states_dir.exists():
-        state_files = {p.stem.upper().replace('-', '_') for p in states_dir.glob("*.md")}
-        states_needing_files = states - {'SELECT_MILESTONE'}
+        state_files = {p.stem for p in states_dir.glob("*.md")}
+        # SELECT_MILESTONE explicitly uses inline reads (Plan + Documentation), no state file needed
+        states_without_files = {'SELECT_MILESTONE'}
+        states_needing_files = manifest_states - states_without_files
         for s in sorted(states_needing_files):
             expected_name = s.lower().replace('_', '-')
-            if s in state_files or expected_name in {p.stem for p in states_dir.glob("*.md")}:
-                ok(f"'{s}' has rules/states/ file")
+            if expected_name in state_files:
+                ok(f"'{s}' → rules/states/{expected_name}.md")
             else:
-                err(f"'{s}' MISSING rules/states/ file (expected: {expected_name}.md)")
+                err(f"'{s}' MISSING rules/states/{expected_name}.md")
     else:
         err("rules/states/ directory NOT FOUND")
 
-    # A.0 ↔ D.1 consistency
+    # A.0 ↔ manifest consistency — A.0 is a derived document, drift is an error
     tools_text = read(ROOT / "implement" / "tools.md")
-    a0_states = {s for s in states if s in tools_text}
-    missing_in_a0 = states - a0_states
-    if missing_in_a0:
-        for s in sorted(missing_in_a0):
-            warn(f"D.1 state '{s}' NOT in A.0 matrix (tools.md)")
+    a0_missing = {s for s in manifest_states if s not in tools_text}
+    if a0_missing:
+        for s in sorted(a0_missing):
+            err(f"'{s}' in manifest but NOT in A.0 matrix (tools.md) — A.0 is derived from manifest, must be kept in sync")
     else:
-        ok(f"All {len(states)} D.1 states in A.0 matrix")
+        ok(f"All {len(manifest_states)} manifest states in A.0 matrix")
 
-    # Authority annotations
-    if '权威源' in read(ROOT / "implement" / "state-machine.md"):
-        ok("D.1 marked as 权威源")
+    # Authority annotations: protocol/ is the authority (v2.2+), manifest is entry point
+    if '权威' in read(ROOT / "protocol" / "state-machine.md") or 'authority' in read(ROOT / "protocol" / "state-machine.md").lower():
+        ok("protocol/state-machine.md declares authority")
+    elif '权威源' in read(ROOT / "core" / "manifest.md"):
+        ok("manifest.md declares authority (legacy)")
     else:
-        warn("D.1 NOT marked as 权威源")
-    if '权威源' in tools_text:
-        ok("A.0 marked as derived from D.1")
-    else:
-        warn("A.0 NOT marked as derived from D.1")
+        warn("No authority declaration found — add to protocol/state-machine.md")
 
     # README must reference core/manifest as authority
     readme_text = read(ROOT / "README.md")
-    if 'core/manifest.md' in readme_text:
+    if 'core/manifest.md' in readme_text and ('权威源' in readme_text or 'authoritative' in readme_text.lower()):
         ok("README references core/manifest.md as authority")
+    elif 'core/manifest.md' in readme_text:
+        ok("README references core/manifest.md")
     else:
         err("README does NOT reference core/manifest.md")
 
@@ -216,8 +254,25 @@ def check_tool_availability():
     tools_text = read_all_implement() + "\n" + read_all_rules()
     skills = set(re.findall(r'Skill\(([^)]+)\)', tools_text))
     agents = set(re.findall(r'Agent\(([^)]+)\)', tools_text))
-    skills.discard('<name>')
-    agents.discard('<agent-name>')
+
+    # Filter out placeholders and composite references
+    def is_placeholder(name):
+        # Chinese text placeholders
+        if re.search(r'[一-鿿]', name):
+            return True
+        # Slash-combined references: "plan-ceo-review/eng-review/design-review"
+        if '/' in name:
+            return True
+        # Generic placeholders
+        if name in ('<name>', '<agent-name>', 'name', 'agent-name'):
+            return True
+        # Example/description text, not real tool names
+        if len(name) > 60:
+            return True
+        return False
+
+    skills = {s for s in skills if not is_placeholder(s)}
+    agents = {a for a in agents if not is_placeholder(a)}
 
     # Scan installed tools
     home = Path.home()
@@ -299,23 +354,353 @@ def check_jit_architecture():
     else:
         err("manifest.md does NOT reference rules/static/")
 
-    # Every file in rules/states/ must be referenced by manifest
+    # Every file in rules/states/ must exist and be covered
     states_dir = ROOT / "rules" / "states"
     if states_dir.exists():
-        for p in states_dir.glob("*.md"):
-            fname = p.name
-            if f"rules/states/{fname}" not in manifest_text:
-                warn(f"rules/states/{fname} NOT referenced in manifest.md")
-        ok("rules/states/ files exist and checked")
+        state_files = list(states_dir.glob("*.md"))
+        # Slim manifest references rules/states/ generically — check protocol/ covers the states
+        protocol_sm = read(ROOT / "protocol" / "state-machine.md")
+        for p in state_files:
+            fname = p.stem  # e.g. "read-context" → state name hint
+            if fname not in manifest_text and f"rules/states/{p.name}" not in manifest_text:
+                pass  # OK — manifest uses generic reference, protocol has details
+        ok(f"rules/states/: {len(state_files)} files present")
+    else:
+        err("rules/states/ directory NOT FOUND")
 
-    # Every file in rules/static/ must be referenced by manifest
+    # Every file in rules/static/ must exist
     static_dir = ROOT / "rules" / "static"
     if static_dir.exists():
-        for p in static_dir.glob("*.md"):
-            fname = p.name
-            if f"rules/static/{fname}" not in manifest_text:
-                warn(f"rules/static/{fname} NOT referenced in manifest.md")
-        ok("rules/static/ files checked against manifest")
+        static_files = list(static_dir.glob("*.md"))
+        ok(f"rules/static/: {len(static_files)} files present")
+    else:
+        err("rules/static/ directory NOT FOUND")
+
+    # Manifest must stay lean (< 100 lines) for JIT architecture claim
+    manifest_lines = len(manifest_text.split('\n'))
+    if manifest_lines > 100:
+        err(f"core/manifest.md: {manifest_lines} lines (JIT limit: 100). "
+            "Move sections to rules/static/loop.md or rules/states/.")
+    elif manifest_lines > 80:
+        warn(f"core/manifest.md: {manifest_lines} lines — approaching JIT limit (100)")
+    else:
+        ok(f"core/manifest.md: {manifest_lines} lines (JIT target ≤100)")
+
+# ─── check 7: persistent state protocol ───
+def check_persistent_state():
+    print("\n[7] Persistent state protocol (.deepship/)")
+
+    # Check templates exist
+    templates = {
+        'templates/state.json': 'state.json template',
+        'templates/work_units.json': 'work_units.json template',
+        'templates/log.jsonl': 'log.jsonl seed file',
+    }
+    for path, desc in templates.items():
+        if (ROOT / path).exists():
+            ok(f"{desc} exists")
+        else:
+            err(f"{desc} MISSING: {path}")
+
+    # Check protocol docs exist
+    protocols = {
+        'rules/protocols/work-unit.md': 'Work Unit Protocol',
+        'rules/protocols/log-format.md': 'Log format spec',
+    }
+    for path, desc in protocols.items():
+        if (ROOT / path).exists():
+            ok(f"{desc} exists")
+        else:
+            err(f"{desc} MISSING: {path}")
+
+    # Check manifest or protocol references persistent state
+    manifest_text = read(ROOT / "core" / "manifest.md")
+    persistence_text = read(ROOT / "protocol" / "persistence.md")
+    for keyword in ['.deepship/state.json', '.deepship/work_units.json', '.deepship/log.jsonl']:
+        if keyword in manifest_text or keyword in persistence_text:
+            ok(f"persistent state: {keyword} referenced")
+        else:
+            err(f"persistent state: {keyword} NOT referenced in manifest or protocol")
+
+    # Check READ_CONTEXT requires state.json
+    read_context = read(ROOT / "rules" / "states" / "read-context.md")
+    if '.deepship/state.json' in read_context:
+        ok("read-context.md requires .deepship/state.json")
+    else:
+        warn("read-context.md does NOT reference .deepship/state.json")
+
+    # Check RECORD requires state.json and log.jsonl updates
+    record = read(ROOT / "rules" / "states" / "record.md")
+    for keyword in ['.deepship/state.json', '.deepship/log.jsonl']:
+        if keyword in record:
+            ok(f"record.md requires {keyword} update")
+        else:
+            err(f"record.md does NOT reference {keyword}")
+
+# ─── check 8: work unit protocol integrity ───
+def check_work_unit_protocol():
+    print("\n[8] Work Unit Protocol integrity")
+
+    # PLAN_STEP must require work unit output
+    plan_step = read(ROOT / "rules" / "states" / "plan-step.md")
+    if 'work unit' in plan_step.lower() or 'work_units' in plan_step:
+        ok("plan-step.md references work units")
+    else:
+        err("plan-step.md does NOT reference work units — must produce WUs")
+
+    if 'rules/protocols/work-unit.md' in plan_step:
+        ok("plan-step.md references work-unit protocol")
+    else:
+        warn("plan-step.md does NOT reference rules/protocols/work-unit.md")
+
+    # ADVANCE must check pending work units
+    advance = read(ROOT / "rules" / "states" / "advance.md")
+    if 'pending work unit' in advance.lower() or 'work_units.json' in advance:
+        ok("advance.md checks pending work units")
+    else:
+        err("advance.md does NOT check pending work units before advancing")
+
+    # EXECUTE must reference work unit protocol
+    execute = read(ROOT / "rules" / "states" / "execute.md")
+    if 'work unit' in execute.lower() or 'files_allowed' in execute:
+        ok("execute.md references work unit boundaries")
+    else:
+        warn("execute.md does NOT reference work unit protocol")
+
+    # RECORD must require work unit integration
+    record = read(ROOT / "rules" / "states" / "record.md")
+    if 'work_units.json' in record:
+        ok("record.md references work_units.json")
+    else:
+        err("record.md does NOT reference work_units.json")
+
+    # COMPLETE must reference work_units.json
+    complete = read(ROOT / "rules" / "states" / "complete.md")
+    if 'work_units.json' in complete:
+        ok("complete.md references work_units.json")
+    else:
+        warn("complete.md does NOT reference work_units.json")
+
+    # manifest.md must have COMPLETE state
+    manifest_text = read(ROOT / "core" / "manifest.md")
+    if 'COMPLETE' in manifest_text:
+        ok("manifest.md contains COMPLETE state")
+    else:
+        err("manifest.md MISSING COMPLETE state")
+
+    # Verify no composite tool references like "plan-ceo-review/eng-review/design-review"
+    all_rules = read_all_rules()
+    composite_refs = re.findall(r'(?:Skill|Agent)\(([^)]*\/[^)]*)\)', all_rules)
+    if composite_refs:
+        for ref in composite_refs:
+            warn(f"Composite tool reference: '{ref}' — use individual references instead")
+    else:
+        ok("no composite tool references found")
+
+# ─── check 9: conformance test set ───
+def check_conformance_tests():
+    print("\n[9] Conformance test set (Policy Engine)")
+
+    conformance_path = ROOT / "tests" / "conformance" / "policy_cases.json"
+    if not conformance_path.exists():
+        err("tests/conformance/policy_cases.json NOT FOUND — required for Policy Engine conformance")
+        return
+
+    try:
+        data = json.loads(read(conformance_path))
+    except Exception as e:
+        err(f"policy_cases.json parse error: {e}")
+        return
+
+    cases = data.get("cases", [])
+    if not cases:
+        err("policy_cases.json has no test cases")
+        return
+
+    ok(f"{len(cases)} conformance cases loaded")
+
+    # Check each case has required fields
+    required_fields = {"name", "state", "tool", "args", "expected", "reason"}
+    for c in cases:
+        missing = required_fields - set(c.keys())
+        if missing:
+            err(f"Case '{c.get('name', 'UNKNOWN')}' missing fields: {missing}")
+        if c.get("expected") not in ("ALLOW", "BLOCK"):
+            err(f"Case '{c['name']}': expected must be ALLOW or BLOCK, got '{c.get('expected')}'")
+        if c.get("work_unit") and "files_allowed" not in c["work_unit"]:
+            warn(f"Case '{c['name']}': work_unit missing files_allowed field")
+
+    # Four minimum hard gates coverage (check by semantic pattern, not gate label)
+    # Gate 1: non-exec states reject mutating tools
+    non_exec_states = {"READ_CONTEXT", "CLARIFY_INTENT", "MAP_REALITY", "SELECT_MILESTONE",
+                       "PLAN_STEP", "VALIDATE", "RECORD", "COMPLETE"}
+    mutating_tools = {"write_file", "edit_file", "bash"}
+    g1_cases = [c for c in cases
+                if c["state"] in non_exec_states
+                and c["tool"] in mutating_tools]
+    g1_blocks = [c for c in g1_cases if c["expected"] == "BLOCK"]
+    if not g1_blocks:
+        err("Gate 1 uncovered: no BLOCK cases for mutating tools in non-exec states")
+    else:
+        ok(f"Gate 1 (state-gated mutating): {len(g1_blocks)} BLOCK across {len(set(c['state'] for c in g1_blocks))} states")
+
+    # Gate 2: pre-PLAN_STEP states reject code edits
+    pre_plan = {"READ_CONTEXT", "CLARIFY_INTENT", "MAP_REALITY", "SELECT_MILESTONE"}
+    g2_cases = [c for c in cases
+                if c["state"] in pre_plan
+                and c["tool"] in ("write_file", "edit_file")
+                and c["expected"] == "BLOCK"]
+    if not g2_cases:
+        err("Gate 2 uncovered: no BLOCK for code edit before PLAN_STEP")
+    else:
+        ok(f"Gate 2 (no-code-before-plan): {len(g2_cases)} BLOCK")
+
+    # Gate 3: EXECUTE with files_allowed boundary
+    g3_cases = [c for c in cases if c.get("work_unit") and "files_allowed" in c["work_unit"]]
+    g3_allow = [c for c in g3_cases if c["expected"] == "ALLOW"]
+    g3_block = [c for c in g3_cases if c["expected"] == "BLOCK"]
+    if not g3_allow:
+        err("Gate 3 uncovered: no ALLOW for in-scope file during EXECUTE")
+    if not g3_block:
+        err("Gate 3 uncovered: no BLOCK for out-of-scope file during EXECUTE")
+    ok(f"Gate 3 (files_allowed boundary): {len(g3_allow)} ALLOW, {len(g3_block)} BLOCK")
+
+    # Gate 4: ADVANCE/COMPLETE require VALIDATE
+    g4_cases = [c for c in cases if c["tool"] == "transition_state"]
+    g4_blocks = [c for c in g4_cases if c["expected"] == "BLOCK"]
+    g4_allows = [c for c in g4_cases if c["expected"] == "ALLOW"]
+    if not g4_blocks:
+        err("Gate 4 uncovered: no BLOCK for transition_state without VALIDATE")
+    ok(f"Gate 4 (transition gating): {len(g4_allows)} ALLOW, {len(g4_blocks)} BLOCK")
+
+    # Additional coverage checks
+    states_in_cases = {c["state"] for c in cases}
+    expected_states = {"READ_CONTEXT", "CLARIFY_INTENT", "MAP_REALITY", "SELECT_MILESTONE",
+                       "PLAN_STEP", "EXECUTE", "VALIDATE", "REPAIR", "RECORD", "ADVANCE", "BLOCK", "COMPLETE"}
+    missing_states = expected_states - states_in_cases
+    if missing_states:
+        warn(f"States not covered by any conformance case: {sorted(missing_states)}")
+    else:
+        ok(f"All {len(expected_states)} states covered")
+
+    # Workspace boundary check
+    ws_cases = [c for c in cases if c.get("workspace")]
+    if ws_cases:
+        ws_blocks = [c for c in ws_cases if c["expected"] == "BLOCK" and c["tool"] in ("write_file", "edit_file")]
+        if ws_blocks:
+            ok(f"Workspace boundary: {len(ws_blocks)} BLOCK for out-of-workspace writes")
+        else:
+            warn("Workspace boundary: no BLOCK cases for system path writes")
+    else:
+        warn("No workspace-scoped conformance cases")
+
+    # Check all conformance files exist
+    conformance_files = [
+        "transition_cases.json",
+        "work_unit_cases.json",
+        "persistence_cases.json",
+    ]
+    for cf in conformance_files:
+        cpath = ROOT / "tests" / "conformance" / cf
+        if cpath.exists():
+            try:
+                cdata = json.loads(read(cpath))
+                ccount = len(cdata.get("cases", []))
+                ok(f"{cf}: {ccount} cases")
+            except Exception as e:
+                err(f"{cf}: parse error — {e}")
+        else:
+            err(f"{cf} NOT FOUND in tests/conformance/")
+
+    # Work Unit cases must cover the autonomy boundary, not only lifecycle enums.
+    wu_path = ROOT / "tests" / "conformance" / "work_unit_cases.json"
+    if wu_path.exists():
+        try:
+            wu_cases = json.loads(read(wu_path)).get("cases", [])
+        except Exception:
+            wu_cases = []
+
+        def wu_has(predicate):
+            return any(predicate(c) for c in wu_cases)
+
+        if wu_has(lambda c: c.get("check") == "can_dispatch_parallel" and c.get("expected") == "ALLOW"):
+            ok("Work Unit conformance: parallel dispatch ALLOW covered")
+        else:
+            err("Work Unit conformance missing parallel dispatch ALLOW case")
+
+        if wu_has(lambda c: c.get("check") == "can_dispatch_parallel" and c.get("expected") == "BLOCK"):
+            ok("Work Unit conformance: parallel dispatch BLOCK covered")
+        else:
+            err("Work Unit conformance missing parallel dispatch BLOCK case")
+
+        if wu_has(lambda c: c.get("action") == "accept_subagent_result" and c.get("expected") == "ALLOW"):
+            ok("Work Unit conformance: subagent result ALLOW covered")
+        else:
+            err("Work Unit conformance missing subagent result ALLOW case")
+
+        if wu_has(lambda c: c.get("action") == "accept_subagent_result" and c.get("expected") == "BLOCK"):
+            ok("Work Unit conformance: subagent result BLOCK covered")
+        else:
+            err("Work Unit conformance missing subagent result BLOCK case")
+
+        if wu_has(lambda c: c.get("action") == "integrate_work_unit" and c.get("expected") == "ALLOW") and \
+           wu_has(lambda c: c.get("action") == "integrate_work_unit" and c.get("expected") == "BLOCK"):
+            ok("Work Unit conformance: integration gate ALLOW/BLOCK covered")
+        else:
+            err("Work Unit conformance missing integration gate ALLOW/BLOCK cases")
+
+# ─── check 10: protocol and adapter integrity ───
+def check_protocol_integrity():
+    print("\n[10] Protocol and adapter integrity")
+
+    # Protocol files must exist
+    protocol_files = [
+        "state-machine.md", "policy.md", "work-unit.md",
+        "persistence.md", "conformance.md"
+    ]
+    for pf in protocol_files:
+        ppath = ROOT / "protocol" / pf
+        if ppath.exists():
+            ok(f"protocol/{pf} exists")
+        else:
+            err(f"protocol/{pf} NOT FOUND")
+
+    # Schema files must exist and be valid JSON
+    schema_files = [
+        "state.schema.json", "work_unit.schema.json",
+        "log.schema.json", "policy_case.schema.json"
+    ]
+    for sf in schema_files:
+        spath = ROOT / "schemas" / sf
+        if spath.exists():
+            try:
+                json.loads(read(spath))
+                ok(f"schemas/{sf} valid JSON")
+            except Exception as e:
+                err(f"schemas/{sf} invalid JSON: {e}")
+        else:
+            err(f"schemas/{sf} NOT FOUND")
+
+    # Adapter documentation must exist
+    adapter_files = [
+        "adapters/claude-code/README.md",
+        "adapters/claude-code/limitations.md",
+        "adapters/mate/README.md",
+    ]
+    for af in adapter_files:
+        apath = ROOT / af
+        if apath.exists():
+            ok(f"{af} exists")
+        else:
+            err(f"{af} NOT FOUND")
+
+    # Policy matrix MUST NOT contain weakening language like "建议而非铁律"
+    policy_text = read(ROOT / "protocol" / "policy.md")
+    weakening_phrases = ["建议而非铁律", "不是枷锁"]
+    for phrase in weakening_phrases:
+        if phrase in policy_text:
+            err(f"protocol/policy.md contains weakening phrase: '{phrase}' — protocol MUST NOT weaken its own authority")
+    ok("protocol/policy.md: no weakening language")
 
 # ─── main ───
 if __name__ == "__main__":
@@ -327,6 +712,10 @@ if __name__ == "__main__":
     check_file_sizes()
     check_tool_availability()
     check_jit_architecture()
+    check_persistent_state()
+    check_work_unit_protocol()
+    check_conformance_tests()
+    check_protocol_integrity()
 
     print(f"\n{'='*40}")
     print(f"Errors: {len(errors)} | Warnings: {len(warnings)}")

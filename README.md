@@ -1,107 +1,174 @@
-# DEEPSHIP — 现实优先的自洽开发框架（v2.1）
+# DEEPSHIP
 
-> AI 自治开发的执行框架——不是项目管理工具，是"AI 怎么干活"的行为规范。
-> 架构：**JIT 动态规则加载**（基于大模型五层工业化架构）。
+> **A recoverable execution discipline for AI coding agents.**
+>
+> DEEPSHIP 不是“让模型无限自治”的 prompt。它是一套 AI 工程执行纪律：把长任务拆成可检查的 Work Unit，用状态机约束推进，用文件系统保存现场，用 fork/rotate 处理并行和上下文耗尽。
 
-## JIT 架构
+## Why
 
+AI 编程代理最容易失败的地方，不是不会写代码，而是长时间工作时会散：
+
+- 做着做着忘了原计划
+- 一边改 hook，一边顺手改 UI、CSS、DB，边界失控
+- 子会话说“完成了”，但没人验收它到底改了什么
+- 上下文快满时直接失忆，下一轮靠猜
+- prompt 里写了一百条规则，但执行点没有牙齿
+
+DEEPSHIP 的目标是给这些行为加一套工程纪律：**每一步都能恢复、能审计、能拒绝、能集成。**
+
+## Core Idea
+
+DEEPSHIP 把一次 AI 工程任务拆成几个稳定概念：
+
+| Concept | Meaning |
+|---------|---------|
+| **State Machine** | 当前处在读上下文、规划、执行、验证、记录还是完成 |
+| **Work Unit (WU)** | 一块有目标、边界、允许文件和验收测试的小任务 |
+| **Policy Gate** | 在错误状态或越界文件上拒绝工具调用 |
+| **Persistence** | `.deepship/state.json`, `work_units.json`, `log.jsonl` 保存现场 |
+| **Fork** | 对已规划、文件边界清晰的任务开 worktree/子会话并行 |
+| **Rotate** | 上下文快满时写 checkpoint，启动新会话继续 |
+| **Collector** | 回收子会话结果，检查边界、测试证据和冲突 |
+| **Conformance Cases** | 让不同 runtime 证明自己真的实现了这套纪律 |
+
+一句话：**DEEPSHIP 让“AI 说做完了”变成“系统验收通过了”。**
+
+## Execution Flow
+
+```mermaid
+flowchart TD
+  A["User task"] --> B["READ_CONTEXT<br/>read project truth + .deepship state"]
+  B --> C["MAP_REALITY<br/>inspect current codebase"]
+  C --> D["PLAN_STEP<br/>create Work Units"]
+  D --> E{"execution_mode"}
+  E --> E1["inline<br/>main thread"]
+  E --> E2["serial<br/>single workflow"]
+  E --> E3["fork<br/>parallel worktrees"]
+
+  E1 --> F["EXECUTE WU<br/>change only files_allowed"]
+  E2 --> F
+
+  E3 --> G["Dispatcher<br/>create worktrees"]
+  G --> H["Worker sessions<br/>one WU per worktree"]
+  H --> R{"continuation_mode = rotatable<br/>and safe point reached?"}
+  R -- "yes" --> R1["write continuation.md"]
+  R1 --> R2["rotate<br/>new session in same worktree"]
+  R2 --> B
+  R -- "no" --> I["worker writes result.json"]
+  I --> J["Collector<br/>bounds / tests / conflicts"]
+  J --> JQ{"collector result"}
+  JQ -- "done + valid" --> V["VALIDATE<br/>global tests / typecheck / build"]
+  JQ -- "failed or invalid" --> P{"failure type"}
+  P -- "implementation bug" --> X["REPAIR"]
+  P -- "bad WU boundary / bad plan" --> D
+
+  F --> R3{"continuation_mode = rotatable<br/>and safe point reached?"}
+  R3 -- "yes" --> R4["write continuation.md"]
+  R4 --> R5["rotate<br/>start new session"]
+  R5 --> B
+  R3 -- "no" --> V
+
+  X --> V
+  V --> Q{"validation passed?"}
+  Q -- "no, fixable" --> X
+  Q -- "no, plan wrong" --> D
+  Q -- "yes" --> K["RECORD<br/>state + work_units + log"]
+  K --> L["done → integrated"]
+  L --> M{"more WU?"}
+  M -- "yes" --> B
+  M -- "no" --> N["COMPLETE"]
 ```
-系统提示词常驻 → core/manifest.md（<70 行，状态机骨架 + 规则加载触发器）
-  ↓ 状态转换时按需 Read
-rules/states/<state>.md（检查表，21-65 行）
-  ↓ EXECUTE 额外加载
-rules/static/{code-style,safety}.md（稳定规则，受益 prompt caching）
-  ↓ 详细查询
-implement/（完整参考手册，不自动加载）
+
+The important split is two-axis:
+
+- `execution_mode` decides the execution topology: `inline`, `serial`, or `fork`.
+- `continuation_mode` decides whether the current workflow may rotate at a safe checkpoint.
+
+So `rotatable` is not a fourth execution mode. A serial WU can rotate in the main workflow, and a forked worker can rotate inside its own worktree. Collector failures also have a real loop: implementation bugs go to `REPAIR`; bad boundaries or bad planning go back to `PLAN_STEP`.
+
+## Work Unit Example
+
+```json
+{
+  "id": "WU-004",
+  "goal": "Implement useClassroom hook",
+  "scope": "Orchestrate planner, session, AI, and DB persistence. Do not change UI.",
+  "files_allowed": [
+    "frontend/src/hooks/useClassroom.ts",
+    "frontend/src/hooks/useClassroom.test.ts"
+  ],
+  "acceptance_tests": [
+    "useClassroom.test.ts passes",
+    "frontend tsc passes"
+  ],
+  "owner": "orchestrator",
+  "status": "pending"
+}
 ```
 
-## 文件体系
+`files_allowed` 是纪律边界。执行中发现预估错了，可以回 `PLAN_STEP` 扩边界或拆新 WU，但不应该偷偷越界。
 
-| 目录/文件 | 职责 | 加载方式 |
-|-----------|------|---------|
-| `core/manifest.md` | 状态机骨架 + 规则加载触发器 + 硬约束 | **常驻**（系统提示词） |
-| `rules/states/` | 10 个状态检查表，每状态进入时 Read | **JIT 按需** |
-| `rules/static/` | 代码规范 + 安全约束（稳定，可缓存） | **EXECUTE 时加载** |
-| `Prompt.md` | 项目目标、硬约束、非目标、Done When | **项目模板**（READ_CONTEXT 时加载） |
-| `Plan.md` | Milestone 切片、Reality Scan、AC、验证命令 | **项目模板**（READ_CONTEXT 时加载） |
-| `Documentation.md` | 活文档：进度、决策、已知问题、运行记录 | **项目实例**（READ_CONTEXT 时加载） |
-| `implement/` | 完整执行手册（工具索引、状态机原文、附录） | **归档参考**（不自动加载） |
+## Repository Map
 
-## 核心流程
+| Path | Purpose |
+|------|---------|
+| `core/manifest.md` | Claude Code 常驻入口，状态机和规则加载触发器 |
+| `rules/states/` | 每个状态的 JIT 检查表 |
+| `rules/protocols/` | Work Unit 和日志格式细则 |
+| `protocol/` | runtime 实现要遵守的权威纪律定义 |
+| `schemas/` | `.deepship/*` 和 conformance case 的 JSON schema |
+| `tests/conformance/` | Policy / transition / WU / persistence 标准测试集 |
+| `adapters/claude-code/` | Claude Code adapter 说明 |
+| `adapters/parallel/` | fork / collector 的 worktree 并行执行器 |
+| `adapters/mate/` | Mate runtime 参考实现方向 |
+| `checks/verify.py` | DEEPSHIP 自检脚本 |
 
-> 权威源：`core/manifest.md`。`implement/state-machine.md` 为完整原文归档。
+## Quick Checks
 
-```
-READ_CONTEXT
-  → CLARIFY_INTENT（目标缺乏可观测行为时触发，否则跳过）
-  → MAP_REALITY → SELECT_MILESTONE → PLAN_STEP
-  → EXECUTE（含 TDD 内循环 + SDD 两级审查 + 并行分派）
-  → VALIDATE → RECORD → ADVANCE | REPAIR | BLOCK
-```
-
-**每次进入新状态必须先 `Read rules/states/<state>.md`。这是硬门禁，不可跳过。**
-
-## 关键原则（按 effort tier 分级执行）
-
-| 原则 | Trivial | Small | Medium+ |
-|------|---------|-------|---------|
-| **Reality-First**：先搜代码确认入口/链路/契约 | 跳过 | 简化 | **必执行** |
-| **TDD**：先写失败测试 → 最小实现 → 重构 | 跳过 | 补关键断言 | **完整红→绿→重构** |
-| **安全自检**（C.1） | 跳过 | 自检 | **必过清单** |
-| **code-reviewer** | 跳过 | 跳过 | **必调** |
-| **交付总结**（D.6.6） | 跳过 | 一行 heartbeat | **完整格式** |
-
-豁免必须在 RECORD 时写明原因。连续跳过 = 空转信号。
-
-## 项目结构
-
-DEEPSHIP 分两层：**全局框架**（一份）+ **项目实例**（每个项目一份）。
-
-```
-~/.claude/DEEPSHIP/                    ← 全局框架
-  core/manifest.md                     ← JIT 入口（唯一常驻）
-  rules/                               ← JIT 规则
-    states/                            ← 10 个状态检查表
-    static/                            ← 稳定规则（受益缓存）
-  implement/                           ← 完整参考手册（归档）
-    tools.md / code-style.md / safety.md / state-machine.md / appendix.md
-  Prompt.md / Plan.md / Documentation.md  ← 通用模板
-  checks/verify.py                     ← 框架自验证脚本
-  README.md                            ← 本文件
-
-<项目>/.claude/DEEPSHIP/               ← 每个项目的真相源
-  Prompt.md                            ← 项目目标、硬约束、Done When
-  Plan.md                              ← Milestone、AC、Reality Scan
-  Documentation.md                     ← 项目进度、决策、已知问题
-  checks/                              ← 项目临时验证脚本
+```bash
+python checks/verify.py
+python -m unittest tests.conformance.test_cc_hook_policy
+python -m unittest tests.conformance.test_global_deepship_policy_guard
 ```
 
-**新项目初始化**：`mkdir -p .claude/DEEPSHIP/{checks,approvals,decisions}`，从全局拷贝三个模板。
+当前 `verify.py` 检查：
 
-**自验证**：`python checks/verify.py`
+- 状态机一致性
+- JIT 规则结构
+- 持久化状态格式
+- Work Unit 纪律完整性
+- conformance case 覆盖
+- adapter 文档完整性
 
-## 版本管理
+## Claude Code Usage
 
-- 按 Plan.md 中 milestone 的版本变化记录
-- `Documentation.md` §4 记录每次变更类型和影响
+DEEPSHIP 在 Claude Code 中通过三层生效：
 
-## 与 Claude Code Harness 的双向关系
+1. `core/manifest.md` 作为常驻入口，提醒模型按状态机工作
+2. `rules/states/*.md` 在进入状态时 JIT 加载
+3. PreToolUse hook 对写文件行为做 adapter 级门禁
 
-DEEPSHIP 是**全局开发框架**（唯一真相源），Claude Code 的以下组件**索引或派生**自 DEEPSHIP：
+Claude Code adapter 不是完整 runtime。它可以拦截很多越界行为，但真正不可绕过的硬执行层应该由 Mate 这类 runtime 在 `ToolRegistry.execute()` 层实现。
 
-| 组件 | 关系 | 维护规则 |
-|------|------|----------|
-| `~/.claude/CLAUDE.md` | **索引指针** → DEEPSHIP | DEEPSHIP 目录结构变化时同步更新 |
-| `~/.claude/rules/common/*.md` | **派生规则** ← DEEPSHIP §B/C | DEEPSHIP 的代码规范/安全约束变更时须同步 |
-| `~/.claude/settings.json` | 独立配置 | DEEPSHIP 推荐 tool/skill，配置属 harness 层 |
+## Fork And Rotate
 
-**修改 DEEPSHIP 时的检查清单：**
-- [ ] 如果改了代码规范：同步 `rules/static/code-style.md` → `rules/common/coding-style.md`
-- [ ] 如果改了安全约束：同步 `rules/static/safety.md` → `rules/common/security.md`
-- [ ] 如果改了状态机/流程：同步 `core/manifest.md` → `CLAUDE.md` 索引
-- [ ] 如果文件结构变了：更新 `README.md` + `CLAUDE.md` + `implement/index.md`
-- [ ] 改完跑 `python checks/verify.py`
+DEEPSHIP 区分两件事：
 
-## 许可
+- **fork**：一个已规划任务拆成多个 worktree/子会话并行执行
+- **rotate**：同一个任务在上下文快满时保存 checkpoint，换新会话继续
+
+fork 是执行拓扑，rotate 是上下文续命。两者可以组合，但都必须有清晰 checkpoint 和回收规则。
+
+## Status
+
+DEEPSHIP 现在处于实验性工程纪律阶段：
+
+- ✅ 状态机、Work Unit、persistence、policy、conformance 已定义
+- ✅ Claude Code hook 和 parallel dispatcher 已有 v0.1
+- ✅ collector 可检查边界、测试证据和冲突
+- 🚧 rotate 仍在设计/实现中
+- 🚧 Mate runtime 的硬门禁仍是长期方向
+
+## License
 
 MIT

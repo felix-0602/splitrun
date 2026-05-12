@@ -1,16 +1,26 @@
 # RECORD 检查表
 
-## 状态审计（每次状态退出时记录）
+## 持久化状态更新（必须，不可跳过）
 
-在 heartbeat 或 Documentation.md 运行记录中标注：
-- [ ] `state_entered`: [状态名]
-- [ ] `rule_file_read`: [✅ 已读 / ⚠️ 部分 / ❌ 跳过+原因]
-- [ ] `exit_condition_met`: [✅ / ❌→REPAIR / ❌→BLOCK]
+**RECORD 的核心职责是把运行时状态写回文件系统，实现可恢复。**
+
+- [ ] **`.deepship/state.json`**：更新 current_state / current_milestone / current_work_unit / last_completed_state / next_action / validation_status / updated_at
+- [ ] **`.deepship/work_units.json`**：更新所有状态变更的 WU（done / integrated / blocked / failed）
+- [ ] **`.deepship/log.jsonl`**：追加一行状态转移记录（from_state / to_state / reason / evidence / result / timestamp）。格式见 `rules/protocols/log-format.md`
+
+## Work Unit 集成
+
+子代理返回后，RECORD 负责回收——但**全局验证已在 VALIDATE 完成**。RECORD 只记录结果：
+
+- [ ] 确认 VALIDATE 已通过（检查 `validation_status` 字段）
+- [ ] 检查 changed_files 是否在 `files_allowed` 内 → 越界 = 回退并记录（此检查应在 EXECUTE 子代理回收时已完成）
+- [ ] 更新 WU 状态：`done` → `integrated`，填写 integration_status
+- [ ] 子代理 done ≠ milestone done——`done` 的 WU 必须在 RECORD 升级为 `integrated` 才能进入 COMPLETE
 
 ## 必须更新 Documentation.md
 
 - [ ] **当前进度**（§1）：milestone 状态、完成率、时间戳
-- [ ] **运行记录**：本轮做了什么、验证结果、剩余风险
+- [ ] **运行记录**（§7）：本轮做了什么、验证结果、剩余风险
 - [ ] **已知问题**（§5）：新发现的问题、遗留的技术债
 
 ## 按需更新
@@ -29,12 +39,3 @@
 ## 规则弹性：豁免必须记录原因
 
 跳过 TDD / 自审 / 需求门禁 / 交付总结时，必须写明理由。连续跳过 = 空转信号。
-
-## 会话结束总结（D.7）
-
-```
-本轮完成：xxx（文件范围）
-还差：xxx
-下一个动作：yyy
-需要你判断：zzz（或"无"）
-```

@@ -1,0 +1,21 @@
+{
+  "version": "1.0",
+  "description": "DEEPSHIP 状态转移一致性测试。Policy Engine 必须全部通过。",
+  "cases": [
+    {"name":"合法转移: READ_CONTEXT→MAP_REALITY","state":"READ_CONTEXT","tool":"transition_state","args":{"from":"READ_CONTEXT","to":"MAP_REALITY"},"expected":"ALLOW","reason":"合法转移路径"},
+    {"name":"合法转移: EXECUTE→VALIDATE","state":"EXECUTE","tool":"transition_state","args":{"from":"EXECUTE","to":"VALIDATE"},"expected":"ALLOW","reason":"EXECUTE 完成后进 VALIDATE"},
+    {"name":"合法转移: VALIDATE pass→RECORD","state":"VALIDATE","tool":"transition_state","args":{"from":"VALIDATE","to":"RECORD"},"validation_status":"passed","expected":"ALLOW","reason":"验证通过进 RECORD"},
+    {"name":"合法转移: VALIDATE fail→REPAIR","state":"VALIDATE","tool":"transition_state","args":{"from":"VALIDATE","to":"REPAIR"},"validation_status":"failed","expected":"ALLOW","reason":"验证失败进 REPAIR"},
+    {"name":"合法转移: RECORD→ADVANCE","state":"RECORD","tool":"transition_state","args":{"from":"RECORD","to":"ADVANCE"},"expected":"ALLOW","reason":"记录完成进 ADVANCE"},
+    {"name":"合法转移: ADVANCE→COMPLETE 全部integrated","state":"ADVANCE","tool":"transition_state","args":{"from":"ADVANCE","to":"COMPLETE"},"work_units":[{"id":"WU1","status":"integrated"}],"expected":"ALLOW","reason":"全部 WU integrated + 无 pending milestone"},
+    {"name":"合法转移: ADVANCE→READ_CONTEXT 有pending WU","state":"ADVANCE","tool":"transition_state","args":{"from":"ADVANCE","to":"READ_CONTEXT"},"work_units":[{"id":"WU1","status":"integrated"},{"id":"WU2","status":"pending"}],"expected":"ALLOW","reason":"还有 pending WU 需要处理"},
+    {"name":"非法转移: READ_CONTEXT→EXECUTE 跳过中间状态","state":"READ_CONTEXT","tool":"transition_state","args":{"from":"READ_CONTEXT","to":"EXECUTE"},"expected":"BLOCK","reason":"跳跃转移，未经过 MAP_REALITY/PLAN_STEP"},
+    {"name":"非法转移: EXECUTE→ADVANCE 跳过VALIDATE","state":"EXECUTE","tool":"transition_state","args":{"from":"EXECUTE","to":"ADVANCE"},"expected":"BLOCK","reason":"必须经过 VALIDATE 才能 ADVANCE"},
+    {"name":"非法转移: VALIDATE pass→REPAIR 方向错误","state":"VALIDATE","tool":"transition_state","args":{"from":"VALIDATE","to":"REPAIR"},"validation_status":"passed","expected":"BLOCK","reason":"验证通过不应进 REPAIR"},
+    {"name":"非法转移: ADVANCE→COMPLETE 有WU done未集成","state":"ADVANCE","tool":"transition_state","args":{"from":"ADVANCE","to":"COMPLETE"},"work_units":[{"id":"WU1","status":"done"}],"expected":"BLOCK","reason":"done 不是终态，必须先集成"},
+    {"name":"非法转移: from参数不匹配当前state","state":"EXECUTE","tool":"transition_state","args":{"from":"READ_CONTEXT","to":"MAP_REALITY"},"expected":"BLOCK","reason":"from 参数不等于 current_state"},
+    {"name":"COMPLETE 是终态拒绝转移","state":"COMPLETE","tool":"transition_state","args":{"from":"COMPLETE","to":"EXECUTE"},"expected":"BLOCK","reason":"COMPLETE 后不能自行转移"},
+    {"name":"REPAIR 第3轮失败→BLOCK","state":"REPAIR","tool":"transition_state","args":{"from":"REPAIR","to":"BLOCK"},"repair_count":3,"expected":"ALLOW","reason":"连续3轮修复失败允许进 BLOCK"},
+    {"name":"REPAIR 第1轮→VALIDATE","state":"REPAIR","tool":"transition_state","args":{"from":"REPAIR","to":"VALIDATE"},"repair_count":1,"expected":"ALLOW","reason":"修复不到3轮可回 VALIDATE"}
+  ]
+}

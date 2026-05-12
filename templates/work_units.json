@@ -1,0 +1,22 @@
+{
+  "_schema": "deepship-work-units/1.0",
+  "_doc": "DEEPSHIP 工作单元状态文件。PLAN_STEP 产出 work units，EXECUTE 更新状态，RECORD 确认集成。",
+  "milestone": null,
+  "work_units": [
+    {
+      "id": "WU-001",
+      "goal": "示例：实现用户登录端点",
+      "scope": "仅限 auth 模块，不涉及前端",
+      "files_allowed": ["src/auth/login.ts", "src/auth/login.test.ts"],
+      "depends_on": [],
+      "acceptance_tests": ["POST /login 返回 200 + token", "错误密码返回 401"],
+      "risk_level": "medium",
+      "owner": "orchestrator",
+      "status": "pending",
+      "validation_evidence": null,
+      "integration_status": null,
+      "created_at": null,
+      "updated_at": null
+    }
+  ]
+}

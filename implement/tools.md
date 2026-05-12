@@ -12,7 +12,7 @@
 
 ### A.0 状态→工具速查矩阵
 
-> 每个 D.1 状态机的状态对应哪些工具。状态定义以 `state-machine.md` D.1 为权威源，本表为工具映射（派生）。**这是建议而非铁律**——如果当前任务的实际情况跟典型场景不同，用自己的判断。此表优先级为 D.0 第 7 级（工具建议），不覆盖用户指令、安全规则或项目约束。
+> 每个状态对应的工具。状态定义以 `core/manifest.md` 为权威源，`state-machine.md` D.1 为归档参考。本表为工具映射（派生）。**这是建议而非铁律**——如果当前任务的实际情况跟典型场景不同，用自己的判断。此表优先级为 D.0 第 7 级（工具建议），不覆盖用户指令、安全规则或项目约束。
 
 | 当前状态 | 首选工具 | 何时跳过 | 关键判断 |
 |----------|----------|----------|----------|
@@ -27,8 +27,9 @@
 | `VALIDATE` | 按 Plan.md 验证命令执行 + `Skill(verification-before-completion)` | —（不跳，但范围可变：最小相关验证到全量收尾验证） | 优先跑 milestone 明确列出的命令 |
 | `REPAIR` | `Skill(systematic-debugging)` | 根因一眼可见时直接修 | 连续 3 次修复失败 → BLOCK |
 | `RECORD` | 更新 `Documentation.md` | —（不跳，但密度可变：一句话摘要到详细记录） | ADVANCE 时必须写交付总结（D.6.6 格式） |
-| `ADVANCE` | 标记 milestone 完成 → 交付总结 → 下一轮 READ_CONTEXT | — | 确认 AC 全部满足 + 文档/版本已同步才能 ADVANCE |
+| `ADVANCE` | 标记 milestone 完成 → 检查 work_units.json 非终态 WU → 交付总结 → READ_CONTEXT（有 pending 时）| — | 全部 WU `integrated` 且 AC 满足才能 ADVANCE；有 `done` 未集成 → 先 RECORD 集成 |
 | `BLOCK` | 记录阻塞原因到 Documentation.md §5 或 §9 | — | 写清楚：阻塞原因、已尝试动作、需要什么外部输入 |
+| `COMPLETE` | 输出最终交付总结 → 更新 state.json → 停止 | — | 所有 WU `integrated`（或无 WU 文档任务）+ 无 pending milestone |
 
 **使用方式**：每个自治循环从 READ_CONTEXT 开始 → 看当前在哪个状态 → 查此表选工具 → 执行 → 推进到下一状态。工具是参考，不是枷锁。
 
@@ -215,6 +216,7 @@ AI 自审只是代码质量底线。以下场景需要 human partner 介入：
 | 自动化审计 | `Skill(automation-audit-ops)` | 自动化资产盘点 |
 | 知识管理 | `Skill(knowledge-ops)` | knowledge base 管理 |
 | **Git Worktree 隔离** | `Skill(using-git-worktrees)` | 需要隔离工作空间时创建独立 worktree，不污染主工作区 |
+| **终端并行分派（分会话）** | `python adapters/parallel/dispatcher.py --mode auto` + `collector.py` | ≥2 个互不依赖 WU 时，固定 runner 创建 git worktree 隔离并行；worker 产出 result.json，collector 验证回收。见 `adapters/parallel/README.md` |
 
 ### A.8 项目管理 (GSD 系统 + Ralph 自治循环)
 

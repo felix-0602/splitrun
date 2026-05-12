@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "deepship-policy-case/1.0",
+  "title": "DEEPSHIP Policy Conformance Case",
+  "type": "object",
+  "required": ["name", "state", "tool", "args", "expected", "reason"],
+  "properties": {
+    "name": {"type": "string"},
+    "state": {"type": "string", "enum": ["READ_CONTEXT","CLARIFY_INTENT","MAP_REALITY","SELECT_MILESTONE","PLAN_STEP","EXECUTE","VALIDATE","REPAIR","RECORD","ADVANCE","BLOCK","COMPLETE"]},
+    "tool": {"type": "string"},
+    "args": {"type": "object"},
+    "work_unit": {
+      "type": ["object", "null"],
+      "properties": {
+        "id": {"type": "string"},
+        "files_allowed": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "workspace": {"type": ["string", "null"]},
+    "expected": {"type": "string", "enum": ["ALLOW", "BLOCK"]},
+    "reason": {"type": "string"}
+  }
+}

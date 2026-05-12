@@ -1,0 +1,31 @@
+{
+  "version": "1.0",
+  "description": "DEEPSHIP Policy Engine conformance test suite. 参考执行层必须全部通过。",
+  "cases": [
+    {"name":"READ_CONTEXT 允许读状态","state":"READ_CONTEXT","tool":"read_file","args":{"file_path":"/ws/.deepship/state.json"},"expected":"ALLOW","reason":"恢复状态必须读取持久化文件"},
+    {"name":"READ_CONTEXT 拒绝改代码","state":"READ_CONTEXT","tool":"write_file","args":{"file_path":"/ws/src/a.py","content":"x"},"expected":"BLOCK","reason":"读取上下文阶段不能修改项目代码"},
+    {"name":"未 READ_CONTEXT 拒绝 mutating","state":"CLARIFY_INTENT","tool":"write_file","args":{"file_path":"/ws/a.py","content":"x"},"expected":"BLOCK","reason":"非执行状态不能修改文件"},
+    {"name":"CLARIFY_INTENT 允许只读","state":"CLARIFY_INTENT","tool":"read_file","args":{"file_path":"/ws/a.py"},"expected":"ALLOW","reason":"只读不受状态门禁"},
+    {"name":"MAP_REALITY 允许 Grep","state":"MAP_REALITY","tool":"grep","args":{"pattern":"TODO"},"expected":"ALLOW","reason":"勘察阶段可用搜索"},
+    {"name":"MAP_REALITY 拒绝写","state":"MAP_REALITY","tool":"edit_file","args":{"file_path":"/ws/main.py","old_string":"x","new_string":"y"},"expected":"BLOCK","reason":"未Plan不能改代码"},
+    {"name":"SELECT_MILESTONE 拒绝写","state":"SELECT_MILESTONE","tool":"write_file","args":{"file_path":"/ws/test.py","content":"t"},"expected":"BLOCK","reason":"选中milestone但还没Plan"},
+    {"name":"PLAN_STEP 拒绝执行","state":"PLAN_STEP","tool":"bash","args":{"command":"rm /ws/old.py"},"expected":"BLOCK","reason":"拆任务阶段不能执行"},
+    {"name":"EXECUTE WU内文件允许","state":"EXECUTE","tool":"write_file","args":{"file_path":"/ws/src/a.py","content":"ok"},"work_unit":{"id":"WU1","files_allowed":["/ws/src/a.py"]},"expected":"ALLOW","reason":"在WU files_allowed内"},
+    {"name":"EXECUTE WU外文件拒绝","state":"EXECUTE","tool":"edit_file","args":{"file_path":"/ws/src/b.py","old_string":"bug","new_string":"fix"},"work_unit":{"id":"WU1","files_allowed":["/ws/src/a.py"]},"expected":"BLOCK","reason":"b.py不在WU内"},
+    {"name":"EXECUTE 只读不检查WU","state":"EXECUTE","tool":"read_file","args":{"file_path":"/ws/src/b.py"},"work_unit":{"id":"WU1","files_allowed":["/ws/src/a.py"]},"expected":"ALLOW","reason":"只读不受WU边界"},
+    {"name":"VALIDATE 允许bash","state":"VALIDATE","tool":"bash","args":{"command":"pytest"},"expected":"ALLOW","reason":"验证需要跑测试"},
+    {"name":"VALIDATE 拒绝写","state":"VALIDATE","tool":"write_file","args":{"file_path":"/ws/a.py","content":"x"},"expected":"BLOCK","reason":"验证失败应进REPAIR"},
+    {"name":"REPAIR 允许改代码","state":"REPAIR","tool":"edit_file","args":{"file_path":"/ws/bug.py","old_string":"bad","new_string":"ok"},"expected":"ALLOW","reason":"修复阶段改代码"},
+    {"name":"RECORD 拒绝改代码","state":"RECORD","tool":"write_file","args":{"file_path":"/ws/a.py","content":"x"},"expected":"BLOCK","reason":"记录阶段不改代码"},
+    {"name":"RECORD 允许写文档","state":"RECORD","tool":"write_file","args":{"file_path":"/ws/Documentation.md","content":"# upd"},"expected":"ALLOW","reason":"记录阶段更新文档"},
+    {"name":"ADVANCE 拒绝改代码","state":"ADVANCE","tool":"edit_file","args":{"file_path":"/ws/src/a.py","old_string":"x","new_string":"y"},"expected":"BLOCK","reason":"推进阶段只能判断下一状态，不能修改代码"},
+    {"name":"未VALIDATE不能ADVANCE","state":"SELECT_MILESTONE","tool":"transition_state","args":{"target":"ADVANCE"},"expected":"BLOCK","reason":"绕过VALIDATE"},
+    {"name":"未VALIDATE不能COMPLETE","state":"EXECUTE","tool":"transition_state","args":{"target":"COMPLETE"},"expected":"BLOCK","reason":"不能跳过VALIDATE"},
+    {"name":"VALIDATE后允许ADVANCE","state":"RECORD","tool":"transition_state","args":{"target":"ADVANCE","validation_status":"passed"},"expected":"ALLOW","reason":"已验证并记录后允许进入ADVANCE"},
+    {"name":"系统路径拒绝","state":"EXECUTE","tool":"write_file","args":{"file_path":"/etc/passwd","content":"h"},"work_unit":{"id":"WU1","files_allowed":["/ws/*"]},"expected":"BLOCK","reason":"不在workspace内"},
+    {"name":"workspace外文件拒绝","state":"EXECUTE","tool":"write_file","args":{"file_path":"/tmp/outside.py","content":"x"},"work_unit":{"id":"WU3","files_allowed":["/tmp/outside.py"]},"workspace":"/ws","expected":"BLOCK","reason":"即使在files_allowed内，也不能写workspace外文件"},
+    {"name":"workspace内文件允许","state":"EXECUTE","tool":"edit_file","args":{"file_path":"/ws/README.md","old_string":"old","new_string":"new"},"work_unit":{"id":"WU2","files_allowed":["/ws/README.md"]},"workspace":"/ws","expected":"ALLOW","reason":"在workspace内且在WU中"},
+    {"name":"COMPLETE 拒绝一切","state":"COMPLETE","tool":"write_file","args":{"file_path":"/ws/a.py","content":"x"},"expected":"BLOCK","reason":"COMPLETE是终态"},
+    {"name":"BLOCK 允许只读","state":"BLOCK","tool":"grep","args":{"pattern":"err"},"expected":"ALLOW","reason":"阻塞时仍可排查"}
+  ]
+}

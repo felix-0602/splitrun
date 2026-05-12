@@ -1,0 +1,1 @@
+{"_schema":"deepship-log/1.0","_doc":"DEEPSHIP 状态转移日志。每行一条 JSON 记录，每次状态变化追加一行。格式见 rules/protocols/log-format.md。本文件由 RECORD 自动维护，新项目初始化时创建为空文件。"}

@@ -1,7 +1,14 @@
-# Local Claude Code settings (per-machine, not versioned)
-.claude/
+# Machine-local Claude Code artifacts (not versioned)
+.claude/*
+# Exception: DEEPSHIP project state IS versioned
+!.claude/DEEPSHIP/
+!.claude/DEEPSHIP/**
 
 # OS files
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Python caches
+__pycache__/
+*.py[cod]

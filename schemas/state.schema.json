@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "deepship-state/1.0",
+  "title": "DEEPSHIP State",
+  "type": "object",
+  "required": ["current_state", "updated_at"],
+  "properties": {
+    "current_state": {
+      "type": "string",
+      "enum": ["READ_CONTEXT","CLARIFY_INTENT","MAP_REALITY","SELECT_MILESTONE","PLAN_STEP","EXECUTE","VALIDATE","REPAIR","RECORD","ADVANCE","BLOCK","COMPLETE"]
+    },
+    "current_milestone": {"type": ["string", "null"]},
+    "current_work_unit": {"type": ["string", "null"]},
+    "last_completed_state": {"type": ["string", "null"]},
+    "next_action": {"type": "string"},
+    "validation_status": {"type": ["string", "null"], "enum": [null, "passed", "failed"]},
+    "updated_at": {"type": "string", "format": "date-time"}
+  }
+}
