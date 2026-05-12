@@ -1,8 +1,8 @@
-# DEEPSHIP
+# DEEPSHIP v0.1.0-rc.1
 
-> **A recoverable execution discipline for AI coding agents.**
+> **可恢复分段自治的 AI 工程执行协议。**
 >
-> DEEPSHIP 不是“让模型无限自治”的 prompt。它是一套 AI 工程执行纪律：把长任务拆成可检查的 Work Unit，用状态机约束推进，用文件系统保存现场，用 fork/rotate 处理并行和上下文耗尽。
+> 不是”让模型无限自治”的 prompt。是一套执行纪律：把长任务拆成可检查的 Work Unit，用状态机约束推进，用 `.deepship/` 文件系统保存现场，用 fork 分会话并行，用 rotate 跨会话续命。
 
 ## Why
 
