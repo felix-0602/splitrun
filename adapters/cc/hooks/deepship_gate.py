@@ -31,7 +31,11 @@ READONLY_TOOLS = {"read", "grep", "glob", "task", "skill", "read_file"}
 TRANSITION_TOOLS = {"transitionstate", "transition_state"}
 
 EXECUTE_STATES = {"EXECUTE", "REPAIR"}
-DOC_PATHS = ["Documentation.md", "CHANGELOG.md", "README.md", ".deepship/", "decisions/", "approvals/"]
+
+# 文件分类
+DEEPSHIP_STATE_FILES = ["state.json", "work_units.json", "log.jsonl"]
+PROJECT_DOC_FILES = ["Documentation.md", "CHANGELOG.md", "README.md", "Prompt.md", "Plan.md"]
+DOC_SUFFIXES = (".md",)
 
 
 def load_deepship_state() -> dict:
@@ -70,8 +74,36 @@ def path_in_workspace(file_path: str, workspace: str | None) -> bool:
     return normalized_file == normalized_ws or normalized_file.startswith(normalized_ws + "/")
 
 
+def _write_kind(file_path: str, root: str | None) -> str:
+    """分类写入目标：state_write / doc_write / code_write。"""
+    fp = file_path.replace("\\", "/")
+
+    # .deepship/ 下的元数据文件
+    if ".deepship/" in fp:
+        for sf in DEEPSHIP_STATE_FILES:
+            if fp.endswith("/" + sf) or fp.endswith(sf):
+                return "state_write"
+        # .deepship/runs/ 下的 result.json 也是元数据
+        if "/runs/" in fp and fp.endswith(".json"):
+            return "state_write"
+        # .deepship/ 下其他文件（continuation.md 等）视为 doc
+        return "doc_write"
+
+    # 项目文档
+    for df in PROJECT_DOC_FILES:
+        if fp.endswith(df) or fp.endswith("/" + df):
+            return "doc_write"
+    if fp.endswith(DOC_SUFFIXES):
+        # .md 文件在项目根目录或 docs/ 下视为文档
+        if "/docs/" in fp or fp.count("/") <= 1:
+            return "doc_write"
+
+    # 其他一切是项目代码
+    return "code_write"
+
+
 def evaluate(tool_name: str, args: dict, state: dict, wu: dict | None) -> tuple[bool, str]:
-    """DEEPSHIP 策略评估（与 PolicyEngine 逻辑一致）"""
+    """DEEPSHIP 策略评估（写分类 + 阶段门禁）。"""
     current_state = state.get("current_state", "READ_CONTEXT")
     tool_key = tool_name.lower()
 
@@ -83,49 +115,96 @@ def evaluate(tool_name: str, args: dict, state: dict, wu: dict | None) -> tuple[
     if tool_key in READONLY_TOOLS:
         return True, "只读工具不受门禁"
 
-    # Gate 2: 状态转移
+    # Gate 2: 状态转移 —— 放行 transition_state 工具
     if tool_key in TRANSITION_TOOLS:
-        target = args.get("target", "")
-        if target == "COMPLETE" and current_state not in ("ADVANCE", "RECORD"):
-            return False, f"不能从 {current_state} 直接到 COMPLETE"
-        if target == "ADVANCE" and current_state != "RECORD":
-            return False, f"不能从 {current_state} 直接到 ADVANCE"
-        validation_status = args.get("validation_status") or state.get("validation_status")
-        if target in ("ADVANCE", "COMPLETE") and validation_status != "passed":
-            return False, f"验证未通过，不能进入 {target}"
-        return True, "允许转移"
+        return True, "transition_state 工具由自身校验合法转移"
 
-    # Gate 3: Mutating 状态门禁
-    if tool_key in MUTATING_TOOLS:
-        if current_state == "RECORD":
-            fp = args.get("file_path", "")
-            if any(pattern.strip('/') in fp for pattern in DOC_PATHS) or fp.endswith('.md'):
-                return True, f"RECORD 阶段允许写文档: {fp}"
-            return False, f"RECORD 阶段不能改代码: {fp}"
+    # Gate 3: Bash 命令——在 VALIDATE / EXECUTE / REPAIR 放行
+    if tool_key == "bash":
+        if current_state in ("VALIDATE", "EXECUTE", "REPAIR", "RECORD"):
+            return True, f"{current_state} 允许 Bash"
+        if current_state == "READ_CONTEXT":
+            cmd = str(args.get("command", "")).strip()
+            if cmd.startswith("git status") or cmd.startswith("git diff") or cmd.startswith("git log"):
+                return True, "READ_CONTEXT 允许 git 只读命令"
+        return False, f"{current_state} 不允许 Bash。推进到 EXECUTE 后执行命令。"
 
-        if current_state == "VALIDATE":
-            if tool_key == "bash":
-                return True, "VALIDATE 阶段允许执行验证命令"
-            return False, "VALIDATE 阶段不能改代码，失败请进 REPAIR"
+    # Gate 4: 写入工具 —— 先分类再按状态放行
+    if tool_key in ("edit", "write", "multiedit", "write_file", "edit_file"):
+        fp = args.get("file_path", "")
+        kind = _write_kind(fp, state.get("workspace"))
+        workspace = state.get("workspace")
+
+        # 工作区边界
+        if not path_in_workspace(fp, workspace):
+            return False, f"文件 {fp} 不在 workspace {workspace} 内"
+
+        # ── 按状态 + 写分类放行 ──
+
+        if current_state == "READ_CONTEXT":
+            if kind == "state_write":
+                return True, f"READ_CONTEXT 允许初始化 state 文件: {fp}"
+            if kind == "doc_write":
+                return True, f"READ_CONTEXT 允许创建文档: {fp}"
+            return False, "READ_CONTEXT 不能改项目代码。先 MAP_REALITY → PLAN_STEP。"
+
+        if current_state in ("CLARIFY_INTENT", "MAP_REALITY"):
+            if kind in ("state_write", "doc_write"):
+                return True, f"{current_state} 允许写 state/doc: {fp}"
+            return False, f"{current_state} 不能改代码。"
+
+        if current_state == "SELECT_MILESTONE":
+            if kind == "state_write":
+                return True, f"SELECT_MILESTONE 允许写 WU 结构: {fp}"
+            if kind == "doc_write":
+                return True, f"SELECT_MILESTONE 允许写计划文档: {fp}"
+            return False, "SELECT_MILESTONE 不能改代码。"
+
+        if current_state == "PLAN_STEP":
+            if kind == "state_write":
+                return True, f"PLAN_STEP 允许写 work_units.json: {fp}"
+            if kind == "doc_write":
+                return True, f"PLAN_STEP 允许写计划文档: {fp}"
+            return False, "PLAN_STEP 只产出 WU 和计划文档，不改项目代码。"
 
         if current_state in EXECUTE_STATES:
-            # WU 边界
-            if wu and tool_key in ("edit", "write", "multiedit", "edit_file", "write_file"):
-                fp = args.get("file_path", "")
-                workspace = state.get("workspace")
-                if not path_in_workspace(fp, workspace):
-                    return False, f"文件 {fp} 不在 workspace {workspace} 内"
-                allowed = wu.get("files_allowed", [])
-                if allowed and fp:
-                    matched = any(
-                        fp == a or fp.startswith(a.rstrip('/*') + '/')
-                        for a in allowed
-                    )
-                    if not matched:
-                        return False, f"文件 {fp} 不在当前 Work Unit files_allowed 中"
-            return True, f"{current_state} 允许 {tool_name}"
+            if kind == "state_write":
+                return False, f"{current_state} 不能改元数据。用 transition_state.py 推进状态，用 RECORD 写集成结果。"
+            if kind == "code_write":
+                # WU 边界检查
+                if wu:
+                    allowed = wu.get("files_allowed", [])
+                    if allowed:
+                        matched = any(
+                            fp == a.replace("\\", "/")
+                            or fp.startswith(a.replace("\\", "/").rstrip("/*") + "/")
+                            for a in allowed
+                        )
+                        if not matched:
+                            return False, f"文件 {fp} 不在当前 WU files_allowed 中"
+                return True, f"{current_state} 允许改代码: {fp}"
+            # EXECUTE 中的 doc_write
+            return True, f"{current_state} 允许写文档: {fp}"
 
-        return False, f"当前状态 {current_state} 不允许 {tool_name}。需先推进到 EXECUTE"
+        if current_state == "VALIDATE":
+            if kind in ("state_write", "doc_write"):
+                return True, f"VALIDATE 允许记录验证结果: {fp}"
+            return False, "VALIDATE 阶段不能改代码。失败请用 transition_state.py --to REPAIR。"
+
+        if current_state == "RECORD":
+            if kind in ("state_write", "doc_write"):
+                return True, f"RECORD 允许写状态和文档: {fp}"
+            return False, "RECORD 阶段不能改代码。集成完成后用 transition_state.py --to ADVANCE。"
+
+        if current_state == "ADVANCE":
+            if kind in ("state_write", "doc_write"):
+                return True, f"ADVANCE 允许写状态和交付总结: {fp}"
+            return False, "ADVANCE 不能改代码。"
+
+        if current_state == "BLOCK":
+            if kind == "doc_write":
+                return True, f"BLOCK 允许记录阻塞原因: {fp}"
+            return False, "BLOCK 只能写文档记录阻塞原因。"
 
     return True, "允许"
 
