@@ -25,6 +25,25 @@
 - [ ] 上次做到哪了？下一步是什么？
 - [ ] 如果是新会话恢复：最近 10 条状态转移记录显示什么路径？
 
+### 旋转恢复（必须，不可跳过）
+
+如果 `.deepship/continuation.md` 存在且 `state.json` 中 `_rotation_pending = true`：
+
+- [ ] **必须读取** `.deepship/continuation.md`
+- [ ] 必须在回复中引用 continuation.md 的 `next_steps`
+- [ ] 确认已理解"我在哪 / 已完成 / diff 意图 / 下一步"
+- [ ] 确认后，清除 `state.json` 中的 `_rotation_pending` 字段：
+  ```bash
+  python -c "
+  import json
+  s = json.load(open('.deepship/state.json'))
+  s.pop('_rotation_pending', None)
+  json.dump(s, open('.deepship/state.json', 'w'), indent=2, ensure_ascii=False)
+  "
+  ```
+- [ ] 直到 `_rotation_pending` 清除后才能 `transition_state.py --to EXECUTE`
+- [ ] 旧 `continuation.md` 可以在 RECORD 后删除
+
 ## 突触检测
 
 - [ ] 若 `Skill(architect-mentor)` 可用且 `/mentor` 未显式关闭 → 激活教学覆盖层

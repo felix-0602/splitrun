@@ -251,11 +251,12 @@ def rotate(
         notes=notes or "（无特殊注意事项）",
     )
 
-    # 更新 state.json 中当前 WU 状态
+    # 更新 state.json：标记旋转 + rotation_pending 门禁
     state = _load_state(root)
     if state:
         state["_rotated_at"] = datetime.now(timezone.utc).isoformat()
         state["_rotated_from_wu"] = current_wu_id
+        state["_rotation_pending"] = True
         state_path = root / DEEPSHIP_DIR / "state.json"
         state_path.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
 

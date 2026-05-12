@@ -571,8 +571,6 @@ def dispatch(
         for wid in wu_ids:
             print(f"             {worktree_paths[wid] / DEEPSHIP_DIR / RUNS_DIR / wid}")
         print(f"           收集结果: python adapters/parallel/collector.py")
-        for proc in processes.values():
-            proc.detach()
         return {}
 
     results = monitor(wu_ids, worktree_paths, timeout=timeout)

@@ -77,52 +77,70 @@
 | 安全审查 | `Agent(security-reviewer)` | [必装] 触发词命中时必调 |
 | 语言专精 | 见 `implement/tools.md` A.3.2 语言→Agent 映射 | [可选] |
 
-### 终端并行分派（fork 执行）
+### Fork 执行（强制纪律）
 
-当 `execution_mode=fork` 的 WU 组就绪时，用固定 runner + git worktree 做分会话并行：
+存在 `execution_mode=fork` 且 `parallel_group` 非空的 WU 组时，**EXECUTE 必须走 dispatcher，不得主线程直接执行这些 WU**。
+
+**fork 前硬门槛**（任一不满足 → 不能 fork）：
+- [ ] 同组 WU ≥ 2，全部 `status: pending`
+- [ ] `depends_on` 已全部满足
+- [ ] `files_allowed` 互不重叠
+- [ ] 工作区干净或可安全创建 worktree
 
 ```bash
 # 分派：创建 worktree + 启动终端 + 监控
 python adapters/parallel/dispatcher.py --mode auto
 
-# 仅启动不监控
-python adapters/parallel/dispatcher.py --mode auto --no-monitor
-
 # 回收：验证所有 worker 的 result.json
 python adapters/parallel/collector.py
-python adapters/parallel/collector.py --show-diff --cleanup
+python adapters/parallel/collector.py --apply --cleanup
 ```
 
-- [ ] 分派前确认 WU 的 `execution_mode=fork`、`parallel_group` 不为 null
-- [ ] runner 自动为每个 fork WU 创建独立 git worktree（`../.deepship-worktrees/WU-XXX/`）
-- [ ] worker 只能改 `files_allowed`，产出 `result.json`，不得修改 `.deepship/*` 元数据
+**fork 后强制 collector**（不能跳过）：
+- [ ] 每个 fork WU 必须有 `result.json`
 - [ ] collector 验证：边界 + 测试覆盖 + 格式 + 跨 WU 冲突
-- [ ] 全部通过后，主线程 RECORD 中合并变更、全局 VALIDATE、标记 `integrated`
+- [ ] 通过后 `--apply` 合并变更
+- [ ] 全局 VALIDATE 通过后才能进入 RECORD
+- [ ] `transition_state.py --to VALIDATE` 会检查 fork WU 是否有 result.json（无 → 拒绝）
 
-### 自旋转（rotate）
+**失败路径**：
+- worker result `done + valid` → collector apply → VALIDATE
+- worker result `failed` 或 invalid → REPAIR 或 PLAN_STEP
+- 跨 WU 冲突 → PLAN_STEP 重新拆解
 
-`continuation_mode=rotatable` 的 WU 可在安全点旋转：
+### 自旋转（rotate 纪律）
 
+`continuation_mode=rotatable` 的 WU，**在触发条件满足时必须 rotate，不得硬撑到上下文溢出**。
+
+**触发条件**（满足任一 → 必须旋转）：
+- [ ] 当前 WU `continuation_mode=rotatable`，且子阶段完成（改动已提交/diff 可解释、测试已跑）
+- [ ] VALIDATE 完成，验收测试结果已记录
+- [ ] RECORD 集成完成，WU 已标记 `integrated`
+- [ ] BLOCK 状态，阻塞原因已写入 Documentation.md
+- [ ] 上下文明显接近耗尽（模型自觉判断 token 余量不足）
+
+**旋转命令**：
 ```bash
-# 保存 checkpoint + 启动新终端
-python adapters/parallel/rotate.py
+python adapters/parallel/rotate.py \
+  --diff-intent "<当前 diff 意图>" \
+  --next-steps "<新会话下一步>"
 
-# 只保存不启动终端（手动继续）
-python adapters/parallel/rotate.py --no-spawn
+# 只保存不启动终端
+python adapters/parallel/rotate.py --no-spawn \
+  --diff-intent "<意图>" --next-steps "<步骤>"
 ```
 
-**安全点**（必须满足至少一条）：
-- [ ] WU 子阶段完成（改动已提交或 diff 可解释、测试已跑）
-- [ ] VALIDATE 完成（验收测试结果已记录）
-- [ ] RECORD 集成完成（WU 已标记 `integrated`）
-- [ ] BLOCK 状态（阻塞原因已写入 Documentation.md）
+**旋转后恢复流程**：
+- [ ] rotate.py 写入 `continuation.md` + 标记 `state.json._rotation_pending = true`
+- [ ] 新会话 READ_CONTEXT **必须**读取 `continuation.md`
+- [ ] 确认后清除 `_rotation_pending`
+- [ ] 清除前 `transition_state.py --to EXECUTE` 被拒绝
+- [ ] 旧会话可以关闭
 
 **禁止旋转**：
-- 有未保存 diff 且意图未写入 `continuation.md`
-- `execution_mode=inline`（inline 任务不旋转）
+- `execution_mode=inline`（inline 不旋转）
+- 有未保存 diff 且意图未写入 continuation.md
 - 测试跑到一半、结果未记录
-
-旋转流程：写 `continuation.md` → 写 `state.json` → `rotate.py` 开新终端 → 新会话 READ_CONTEXT 读取接上。旧终端可关闭。
 
 ## 影响面预警（D.6.4）
 

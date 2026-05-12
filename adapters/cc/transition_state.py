@@ -86,15 +86,7 @@ def _check_guard(
         if context.get("acceptance_tests_ran") or _find_result_file(current_wu_id):
             return True, ""
 
-    # → ADVANCE: 当前 milestone 所有 WU 状态为 integrated
-    if to_state == "ADVANCE":
-        if wus:
-            not_integrated = [
-                w["id"] for w in wus
-                if w.get("status") != "integrated"
-            ]
-            if not_integrated:
-                return False, f"以下 WU 未 integrated: {not_integrated}"
+    
 
     # → COMPLETE: 所有 WU integrated（或无 WU 文档任务）
     if to_state == "COMPLETE":
@@ -106,15 +98,16 @@ def _check_guard(
             if not_integrated:
                 return False, f"以下 WU 未 integrated: {not_integrated}"
 
-    # → ADVANCE: 所有 WU must be integrated
+    # → ADVANCE: 已启动的 WU（in_progress/done）必须 integrated。pending 允许。
     if to_state == "ADVANCE":
         if wus:
             not_integrated = [
                 w["id"] for w in wus
-                if w.get("status") != "integrated"
+                if w.get("status") in ("in_progress", "done", "blocked", "failed")
+                and w.get("status") != "integrated"
             ]
             if not_integrated:
-                return False, f"以下 WU 未 integrated: {not_integrated}"
+                return False, f"以下已启动 WU 未 integrated: {not_integrated}"
 
     # → COMPLETE: 所有 WU integrated（或无 WU 纯文档任务）
     if to_state == "COMPLETE":
@@ -144,6 +137,22 @@ def _find_result_file(wu_id: str) -> Path | None:
         if result.exists():
             return result
     return None
+
+
+def _check_files_in_bounds(result: dict, wu: dict) -> bool:
+    """检查 result.json 的 changed_files 是否在 WU 的 files_allowed 内。"""
+    allowed = {a.replace("\\", "/").rstrip("/") for a in wu.get("files_allowed", [])}
+    if not allowed:
+        return True  # 未定义边界，跳过检查
+    for f in result.get("changed_files", []):
+        f_norm = f.replace("\\", "/")
+        matched = any(
+            f_norm == a or f_norm.startswith(a.rstrip("/") + "/")
+            for a in allowed
+        )
+        if not matched:
+            return False
+    return True
 
 
 # ── 状态读写 ────────────────────────────────────────────
@@ -186,6 +195,49 @@ def _append_log(root: Path, entry: dict) -> None:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
+def write_pending_record(root: Path, event_type: str, message: str, context: dict | None = None) -> None:
+    """在 EXECUTE/REPAIR 中途合规记录事件。追加到 pending_records.jsonl，RECORD 时回收。"""
+    pr = root / ".deepship" / "pending_records.jsonl"
+    pr.parent.mkdir(parents=True, exist_ok=True)
+    record = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "event_type": event_type,
+        "message": message,
+        "context": context or {},
+    }
+    with open(pr, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
+def _recover_pending_records(root: Path) -> list[dict]:
+    """RECORD 时回收 pending_records.jsonl，返回已回收的记录列表，清空文件。"""
+    pr = root / ".deepship" / "pending_records.jsonl"
+    if not pr.exists():
+        return []
+    records = []
+    with open(pr, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                try:
+                    records.append(json.loads(line))
+                except json.JSONDecodeError:
+                    pass
+    # 追加到 Documentation.md（如果存在）
+    if records:
+        doc_path = root / ".claude" / "DEEPSHIP" / "Documentation.md"
+        if not doc_path.exists():
+            doc_path = root / "Documentation.md"
+        if doc_path.exists():
+            with open(doc_path, "a", encoding="utf-8") as f:
+                f.write(f"\n### 待定记录回收 — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}\n\n")
+                for r in records:
+                    f.write(f"- **{r['event_type']}**: {r['message']}\n")
+    # 清空文件
+    pr.write_text("", encoding="utf-8")
+    return records
+
+
 # ── 主逻辑 ──────────────────────────────────────────────
 
 
@@ -209,6 +261,46 @@ def transition(
     if wu_id:
         state["current_work_unit"] = wu_id
 
+    # 0. rotation_pending 门禁：新会话必须先确认 continuation 已读
+    if to_state == "EXECUTE" and state.get("_rotation_pending"):
+        return {
+            "success": False,
+            "from": from_state,
+            "to": to_state,
+            "reason": "rotation_pending=true——新会话必须先 READ_CONTEXT 读取 continuation.md，确认后清除 _rotation_pending 再进 EXECUTE。",
+        }
+
+    # 0. fork 门禁：有 fork WU 未回收时不能从 EXECUTE 直接到 VALIDATE
+    if to_state == "VALIDATE" and from_state == "EXECUTE":
+        fork_wus_in_flight = [
+            w for w in wus
+            if w.get("execution_mode") == "fork"
+            and w.get("status") in ("in_progress", "done")
+        ]
+        # 检查是否有 collector evidence
+        if fork_wus_in_flight:
+            for fw in fork_wus_in_flight:
+                result = _find_result_file(fw["id"])
+                if not result:
+                    return {
+                        "success": False,
+                        "from": from_state,
+                        "to": to_state,
+                        "reason": f"fork WU {fw['id']} 没有 result.json——fork 必须经过 collector 回收。请运行 collector.py。",
+                    }
+                # 边界校验：changed_files ⊆ files_allowed
+                try:
+                    data = json.loads(result.read_text(encoding="utf-8"))
+                    if not _check_files_in_bounds(data, fw):
+                        return {
+                            "success": False,
+                            "from": from_state,
+                            "to": to_state,
+                            "reason": f"fork WU {fw['id']} 的 changed_files 越界。",
+                        }
+                except (json.JSONDecodeError, OSError):
+                    pass  # 格式问题由 collector 处理
+
     # 1. 校验合法转移
     allowed = LEGAL_TRANSITIONS.get(from_state, set())
     if to_state not in allowed:
@@ -230,7 +322,13 @@ def transition(
             "reason": f"Guard 未通过: {reason}",
         }
 
-    # 3. 更新状态
+    # 3. RECORD 时回收 pending records
+    if to_state == "RECORD":
+        recovered = _recover_pending_records(root)
+        if recovered:
+            print(f"[RECORD] 已回收 {len(recovered)} 条 pending records 到 Documentation.md")
+
+    # 4. 更新状态
     old_state = dict(state)
     state["current_state"] = to_state
 

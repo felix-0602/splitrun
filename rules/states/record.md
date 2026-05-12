@@ -17,6 +17,17 @@
 - [ ] 更新 WU 状态：`done` → `integrated`，填写 integration_status
 - [ ] 子代理 done ≠ milestone done——`done` 的 WU 必须在 RECORD 升级为 `integrated` 才能进入 COMPLETE
 
+### Fork WU 集成（强制）
+
+`execution_mode=fork` 的 WU 进入 RECORD 前必须通过 collector 回收：
+
+- [ ] 每个 fork WU 必须有对应的 `result.json`
+- [ ] collector 已验证：边界（changed_files ⊆ files_allowed） + 测试覆盖 + 格式 + 跨 WU 冲突
+- [ ] collector `--apply` 已将 worktree 变更合入主仓库
+- [ ] 无 collector evidence 的 fork WU **不能**标记为 `integrated`
+- [ ] fork WU 的 `integration_status` 必须注明 collector 验证结果
+- [ ] `transition_state.py --to VALIDATE` 会检查 fork WU 是否有 result.json（无 → 拒绝）
+
 ## 必须更新 Documentation.md
 
 - [ ] **当前进度**（§1）：milestone 状态、完成率、时间戳
@@ -29,6 +40,14 @@
 - [ ] **文档与版本**（§4）：用户可见变化、API/数据契约变化、版本影响
 - [ ] **阻塞**：原因、已尝试动作、需要什么外部输入
 - [ ] **审批记录**（§9）：不可逆操作
+
+### Pending Records 回收
+
+EXECUTE/REPAIR 中不得直接写 Documentation.md。如需记录事件：
+
+- [ ] 调用 `write_pending_record(root, event_type, message)` 追加到 `.deepship/pending_records.jsonl`
+- [ ] RECORD 进入时 `transition_state.py` 自动回收 pending records 到 Documentation.md
+- [ ] 回收后 pending_records.jsonl 清空
 
 ## 记录密度
 

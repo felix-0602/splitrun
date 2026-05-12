@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
-DEEPSHIP Claude Code Adapter — PreToolUse Gate Hook
+DEEPSHIP Claude Code Adapter — PreToolUse Gate Hook（参考实现，非权威源）
+
+权威 hook 实现为 ~/.claude/hooks/deepship-policy-guard.js（Node.js）。
+本文件提供等价的 Python 参考实现，供测试和文档使用。
 
 读取 .deepship/state.json + work_units.json，执行策略门禁。
 返回 CC hooks 兼容的 JSON 到 stdout。
@@ -115,9 +118,33 @@ def evaluate(tool_name: str, args: dict, state: dict, wu: dict | None) -> tuple[
     if tool_key in READONLY_TOOLS:
         return True, "只读工具不受门禁"
 
-    # Gate 2: 状态转移 —— 放行 transition_state 工具
+    # Gate 2: 状态转移 —— 校验合法转移（第一道防线）
     if tool_key in TRANSITION_TOOLS:
-        return True, "transition_state 工具由自身校验合法转移"
+        target = args.get("target") or args.get("to") or ""
+        if not target:
+            return False, "transition_state 缺少 target/to 参数"
+
+        # 合法转移表（与 protocol/state-machine.md 对齐）
+        legal_transitions = {
+            "READ_CONTEXT":     {"CLARIFY_INTENT", "MAP_REALITY"},
+            "CLARIFY_INTENT":   {"MAP_REALITY", "BLOCK"},
+            "MAP_REALITY":      {"SELECT_MILESTONE", "BLOCK"},
+            "SELECT_MILESTONE": {"PLAN_STEP", "BLOCK"},
+            "PLAN_STEP":        {"EXECUTE"},
+            "EXECUTE":          {"VALIDATE"},
+            "VALIDATE":         {"RECORD", "REPAIR"},
+            "REPAIR":           {"VALIDATE", "BLOCK"},
+            "RECORD":           {"ADVANCE"},
+            "ADVANCE":          {"READ_CONTEXT", "COMPLETE"},
+            "BLOCK":            {"READ_CONTEXT"},
+            "COMPLETE":         {"READ_CONTEXT"},
+        }
+
+        allowed_targets = legal_transitions.get(current_state, set())
+        if target not in allowed_targets:
+            legal = ", ".join(sorted(allowed_targets)) if allowed_targets else "（终态）"
+            return False, f"非法转移: {current_state} → {target}。合法目标: {legal}"
+        return True, f"转移 {current_state} → {target} 合法"
 
     # Gate 3: Bash 命令——在 VALIDATE / EXECUTE / REPAIR 放行
     if tool_key == "bash":

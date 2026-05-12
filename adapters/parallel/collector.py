@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -281,7 +282,7 @@ def show_unmerged_diff(project_root: Path, wu_ids: list[str]) -> None:
         if not wt_path.exists():
             continue
         try:
-            result = subprocess = __import__("subprocess").run(
+            result = subprocess.run(
                 ["git", "-C", str(wt_path), "diff", "HEAD"],
                 capture_output=True, text=True, timeout=10,
             )
