@@ -6,7 +6,8 @@ import unittest
 from pathlib import Path
 
 
-HOOK_PATH = Path.home() / ".claude" / "hooks" / "deepship-policy-guard.js"
+ROOT = Path(__file__).resolve().parents[2]
+HOOK_PATH = ROOT / "adapters" / "claude-code" / "hooks" / "deepship-policy-guard.js"
 
 
 def run_hook(cwd: Path, target: Path, trusted_roots=None):

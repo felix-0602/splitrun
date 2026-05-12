@@ -35,6 +35,19 @@ ADVANCE
 
 ## Hook Gate
 
+The versioned hook source lives in this repository:
+
+```text
+adapters/claude-code/hooks/deepship-policy-guard.js
+```
+
+Install or update the global hook from that source:
+
+```powershell
+New-Item -ItemType Directory -Force -Path "$HOME\.claude\hooks"
+Copy-Item adapters\claude-code\hooks\deepship-policy-guard.js "$HOME\.claude\hooks\deepship-policy-guard.js" -Force
+```
+
 The global hook is usually installed at:
 
 ```text
@@ -68,9 +81,10 @@ Run:
 ```bash
 python -m unittest tests.conformance.test_cc_hook_policy
 python -m unittest tests.conformance.test_global_deepship_policy_guard
+python -m unittest tests.conformance.test_bash_hook_policy
 ```
 
-These tests prove the adapter hook matches the policy cases and that trusted roots do not accidentally open arbitrary external writes.
+These tests prove the adapter hook matches the policy cases, that trusted roots do not accidentally open arbitrary external writes, and that Bash metadata writes are blocked even through multiline commands.
 
 ## Limits
 
