@@ -1,69 +1,72 @@
-# Parallel Adapter
+# 并行适配器
 
-> Worktree-based fork/collector adapter for DEEPSHIP execution discipline.
+> 基于 worktree 隔离的 fork/collector 适配器——DEEPSHIP 执行纪律的分会话并行实现。
 
-This adapter handles the **fork** side of DEEPSHIP: when PLAN_STEP has already split a task into independent Work Units, it can open isolated worktrees and let multiple Claude Code sessions work in parallel.
+本适配器负责 DEEPSHIP 的 **fork** 侧：当 PLAN_STEP 已把任务拆成独立 Work Unit 后，为互不依赖的 WU 创建隔离 git worktree，让多个 Claude Code 会话真并行工作。
 
-It does not replace the main DEEPSHIP loop. The main thread still owns planning, validation, recording, and final integration.
+它不取代 DEEPSHIP 主循环。规划、验证、记录和最终集成仍由主线程掌控。
 
-## When To Fork
+## 什么时候用 fork
 
-Fork is for planned parallelism, not impulse parallelism.
+Fork 用于**已规划的并行**，不用于临时冲动并行。
 
-Use it when all of these are true:
+同时满足以下条件才用：
 
-- PLAN_STEP has produced multiple pending WU
-- those WU have no unresolved dependencies
-- their `files_allowed` sets do not overlap
-- each WU has acceptance tests or concrete acceptance assertions
-- the task is large enough that parallelism is worth the coordination cost
+- PLAN_STEP 已产出多个 `status: pending` 的 WU
+- 这些 WU 的 `depends_on` 均已满足
+- `files_allowed` 互不重叠
+- 每个 WU 都有验收测试或明确的验收断言
+- 任务大到并行带来的协调成本值得
 
-Do not fork for small edits, unclear scope, shared-file refactors, or tasks where the plan is still moving.
+**不要**在小改动、边界模糊、共享文件重构、或计划还在变动时用 fork。
 
-## Flow
+## 流程
 
 ```mermaid
 flowchart TD
   A["PLAN_STEP<br/>work_units.json"] --> B["dispatcher.py"]
-  B --> C["create git worktree per WU"]
-  C --> D["launch worker session"]
-  D --> E["worker edits only files_allowed"]
-  E --> F["worker writes result.json"]
+  B --> C["为每个 WU 创建 git worktree"]
+  C --> D["启动 worker 子会话"]
+  D --> E["worker 只改 files_allowed 内的文件"]
+  E --> F["worker 写入 result.json"]
   F --> G["collector.py"]
-  G --> H["check changed_files"]
-  G --> I["check tests_run"]
-  G --> J["check cross-WU conflicts"]
-  H --> K["main thread VALIDATE"]
+  G --> H["检查 changed_files"]
+  G --> I["检查 tests_run"]
+  G --> J["检查跨 WU 冲突"]
+  H --> K["主线程 VALIDATE"]
   I --> K
   J --> K
   K --> L["RECORD<br/>done → integrated"]
 ```
 
-## Commands
+## 命令
 
 ```bash
-# See dispatchable WU
+# 查看可调度 WU
 python adapters/parallel/dispatcher.py --mode check
 
-# Create worktrees, launch sessions, monitor, and summarize
+# 创建 worktree、启动终端、监控、汇总
 python adapters/parallel/dispatcher.py --mode auto
 
-# Dispatch selected WU only
+# 只调度指定 WU
 python adapters/parallel/dispatcher.py --wu WU-001,WU-002
 
-# Launch but do not monitor
+# 启动终端但不监控
 python adapters/parallel/dispatcher.py --mode auto --no-monitor
 
-# Collect and validate worker results
+# 回收并验证 worker 结果
 python adapters/parallel/collector.py
 
-# Collect, show diff, and clean worktrees after successful validation
-python adapters/parallel/collector.py --show-diff --cleanup
+# 回收 + 验证 + 合并 + 清理（完整流程）
+python adapters/parallel/collector.py --apply --cleanup
+
+# 回收 + 展示 diff
+python adapters/parallel/collector.py --show-diff
 ```
 
-## Worker Contract
+## Worker 契约
 
-Each worker writes:
+每个 worker 写入：
 
 ```json
 {
@@ -71,36 +74,38 @@ Each worker writes:
   "status": "done",
   "changed_files": ["src/auth.py"],
   "tests_run": ["pytest tests/test_auth.py -v"],
-  "summary": "Added auth logging middleware",
+  "summary": "添加了认证日志中间件",
   "risks": null
 }
 ```
 
-The worker must not edit:
+Worker **不得修改**：
 
 - `.deepship/state.json`
 - `.deepship/work_units.json`
 - `.deepship/log.jsonl`
 
-`done` means “the worker claims its WU is complete.” It does not mean the WU is part of the final system. Only the main thread can move `done → integrated` after collector checks and global validation.
+`done` 表示"worker 声称它的 WU 已完成"。这不意味着该 WU 已是最终系统的一部分。只有主线程在 collector 检查通过和全局验证后，才能把 `done → integrated`。
 
-## Collector Checks
+## Collector 校验
 
-The collector verifies:
+Collector 逐项验证：
 
-- required `result.json` fields exist
+- `result.json` 必填字段完整
 - `changed_files ⊆ files_allowed`
-- `tests_run` covers `acceptance_tests`
-- no two workers changed the same file
-- no worker changed DEEPSHIP metadata
+- `tests_run` 覆盖 `acceptance_tests`
+- 没有两个 worker 修改了同一文件
+- 没有 worker 修改了 DEEPSHIP 元数据
 
-Failed collection sends the work back to REPAIR or PLAN_STEP.
+未通过 → 回到 `REPAIR` 或 `PLAN_STEP`。
 
-## Fork vs Rotate
+合并用 `--apply` 显式触发：从 worktree 生成 patch → `git apply` 到主仓库。`--cleanup` 必须在 `--apply` 成功后才会执行，防止未合并就清理导致改动丢失。
 
-Fork and rotate solve different problems:
+## Fork 和 Rotate 的区别
 
-- **fork**: multiple WU run in parallel
-- **rotate**: one long-running WU saves checkpoint and resumes in a new session
+Fork 和 Rotate 解决不同问题：
 
-This adapter implements fork. Rotate should use a continuation/checkpoint flow, not the collector path.
+- **fork**：多个 WU 并行执行
+- **rotate**：单个长任务在安全点保存 checkpoint，换新会话继续
+
+本适配器实现 fork。Rotate 走 continuation/checkpoint 流程，不走 collector 路径。
