@@ -228,11 +228,11 @@ def _recover_pending_records(root: Path) -> list[dict]:
         doc_path = root / ".claude" / "DEEPSHIP" / "Documentation.md"
         if not doc_path.exists():
             doc_path = root / "Documentation.md"
-        if doc_path.exists():
-            with open(doc_path, "a", encoding="utf-8") as f:
-                f.write(f"\n### 待定记录回收 — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}\n\n")
-                for r in records:
-                    f.write(f"- **{r['event_type']}**: {r['message']}\n")
+        doc_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(doc_path, "a", encoding="utf-8") as f:
+            f.write(f"\n### 待定记录回收 — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}\n\n")
+            for r in records:
+                f.write(f"- **{r['event_type']}**: {r['message']}\n")
     # 清空文件
     pr.write_text("", encoding="utf-8")
     return records
