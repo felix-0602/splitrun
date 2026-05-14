@@ -41,6 +41,28 @@ LEGAL_TRANSITIONS: dict[str, set[str]] = {
     "COMPLETE":         {"READ_CONTEXT"},
 }
 
+# Profile 覆盖转移表
+PROFILE_TRANSITION_OVERRIDES: dict[str, dict[str, set[str]]] = {
+    "deployment": {
+        "READ_CONTEXT": {"EXECUTE"},
+    },
+    "debug": {
+        "READ_CONTEXT": {"MAP_REALITY"},
+        "MAP_REALITY":  {"EXECUTE", "BLOCK"},
+    },
+}
+
+
+def _get_profile_aware_transitions(active_profile: str) -> dict[str, set[str]]:
+    """返回合并了 profile 覆盖的合法转移表。"""
+    if not active_profile or active_profile == "development":
+        return dict(LEGAL_TRANSITIONS)
+    merged = dict(LEGAL_TRANSITIONS)
+    overrides = PROFILE_TRANSITION_OVERRIDES.get(active_profile, {})
+    for state, targets in overrides.items():
+        merged[state] = targets
+    return merged
+
 # ── Guard 条件 ──────────────────────────────────────────
 
 
@@ -135,6 +157,7 @@ def _check_guard(
         state["_session_wu_count"] = 0
 
     # → ADVANCE: 已启动的 WU（in_progress/done）必须 integrated + review 通过。pending 允许。
+    # 然后检测自动续推：有 pending WU + continuation_mode=normal → 自动设 next_action。
     if to_state == "ADVANCE":
         if wus:
             not_integrated = [
@@ -165,6 +188,42 @@ def _check_guard(
             if missing_review:
                 return False, f"review 门禁未通过: {'; '.join(missing_review)}"
 
+            # ── 自动续推（block 纪律级别：强制执行，不允许跳过）──
+            pending = [w for w in wus if w.get("status") == "pending"]
+            if pending:
+                ready = [w for w in pending if not _has_blocking_deps(w, wus)]
+                if ready:
+                    next_wu = ready[0]
+                    cont_mode = current_wu.get("continuation_mode", "normal") if current_wu else "normal"
+                    if cont_mode == "normal":
+                        state["next_action"] = "continue_next_wu"
+                        state["next_wu"] = next_wu["id"]
+                        state["_pending_wu_count"] = len(pending)
+                        print(
+                            f"[ADVANCE] auto-continue: {current_wu_id} → {next_wu['id']} "
+                            f"({len(pending)} pending WUs, continuation_mode=normal)"
+                        )
+                    else:
+                        state["next_action"] = "await_user"
+                        state["next_wu"] = next_wu["id"]
+                        state["_pending_wu_count"] = len(pending)
+                        print(
+                            f"[ADVANCE] paused: continuation_mode={cont_mode}, "
+                            f"{len(pending)} pending WUs, next={next_wu['id']}"
+                        )
+                else:
+                    blocked = [w["id"] for w in pending if _has_blocking_deps(w, wus)]
+                    state["next_action"] = "blocked_on_deps"
+                    state["_blocked_wus"] = blocked
+                    print(
+                        f"[ADVANCE] blocked: {len(pending)} pending WUs, "
+                        f"{len(blocked)} blocked by dependencies: {blocked}"
+                    )
+            else:
+                state["next_action"] = "milestone_complete"
+                state["_pending_wu_count"] = 0
+                print(f"[ADVANCE] milestone complete: all {len(wus)} WUs integrated")
+
     # → REPAIR: VALIDATE 失败证据 + repair_count < 3
     if to_state == "REPAIR":
         if not context.get("validation_failed"):
@@ -183,6 +242,19 @@ def _find_result_file(wu_id: str) -> Path | None:
         if result.exists():
             return result
     return None
+
+
+def _has_blocking_deps(wu: dict, all_wus: list[dict]) -> bool:
+    """检查 WU 的 depends_on 中是否有未 integrated 的 WU。"""
+    deps = wu.get("depends_on", [])
+    if not deps:
+        return False
+    wu_map = {w["id"]: w for w in all_wus}
+    for dep_id in deps:
+        dep = wu_map.get(dep_id, {})
+        if dep.get("status") != "integrated":
+            return True
+    return False
 
 
 def _check_files_in_bounds(result: dict, wu: dict) -> bool:
@@ -397,6 +469,7 @@ def transition(
     state = _load_state(root)
     wus = _load_work_units(root)
     from_state = state.get("current_state", "READ_CONTEXT")
+    active_profile = state.get("active_profile", "development")
 
     # 0. --clear-rotation: 允许 READ_CONTEXT 和 PLAN_STEP（PLAN_STEP 可能因 rotate 门禁死锁）
     if clear_rotation:
@@ -550,8 +623,9 @@ def transition(
                 except (json.JSONDecodeError, OSError):
                     pass  # 格式问题由 collector 处理
 
-    # 1. 校验合法转移
-    allowed = LEGAL_TRANSITIONS.get(from_state, set())
+    # 1. 校验合法转移（profile-aware）
+    legal = _get_profile_aware_transitions(active_profile)
+    allowed = legal.get(from_state, set())
     if to_state not in allowed:
         legal = ", ".join(sorted(allowed)) if allowed else "（终态）"
         return {

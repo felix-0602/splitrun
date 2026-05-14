@@ -22,8 +22,9 @@ WU 的执行行为由两个正交轴定义：
 - `fork`：同 `parallel_group` 的 WU 由 dispatcher 并行分派到独立 git worktree。
 
 **`continuation_mode`**：
-- `normal`（默认）：不旋转。单会话搞定。
+- `normal`（默认）：单会话搞定。当前 WU 完成后，ADVANCE guard **自动**将 `next_action` 设为 `continue_next_wu`，READ_CONTEXT **强制**继续到下一个 pending WU。不允许模型自行判断是否停下——这是 block 纪律级别的规则。
 - `rotatable`：允许在安全点写 `continuation.md` 后跨会话旋转。安全点定义见 §旋转安全点。
+- `await_user`：当前 WU 完成后暂停，等待用户确认后才继续。用于需要人工决策的 WU 链。
 
 两轴可组合：`fork` WU 也可以是 `rotatable`（分叉出的 worker 如果任务很长，可以在自己的 worktree 里旋转）。`inline` 通常搭配 `normal`。
 

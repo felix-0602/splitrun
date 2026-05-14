@@ -20,6 +20,11 @@ from adapters.parallel.rotate import (
     rotate,
     write_continuation,
 )
+from adapters.parallel.spawn_lane import (
+    LaneSpawner,
+    list_active_lanes,
+    spawn_interactive_terminal,
+)
 from adapters.interrupt.schemas import (
     RouteType,
     ReconciliationOutcome,
@@ -60,4 +65,7 @@ __all__ = [
     "RevolutionProposal",
     "BlockingConstraint",
     "RevolutionAuditEntry",
+    "LaneSpawner",
+    "list_active_lanes",
+    "spawn_interactive_terminal",
 ]

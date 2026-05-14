@@ -27,13 +27,13 @@
 
 | 规则 | 内容 |
 |------|------|
-| **自动推进** | 当前 milestone 内有 pending 任务时，ADVANCE 后自动进入下一轮 READ_CONTEXT |
-| **终止条件** | 当前用户请求完成 且 无 pending milestone → `COMPLETE`（输出总结，停止） |
-| **停等条件** | 仅在 BLOCK / Help Gradient "判断" / "需要你" 时停止 |
+| **自动推进** | 当前 milestone 内有 pending WU 且 `continuation_mode=normal` 时，ADVANCE guard 自动写入 `next_action: continue_next_wu` 到 state.json。READ_CONTEXT **必须**立即推进到下一个 WU 的 EXECUTE，不允许等待用户输入。这是 block 纪律级别。 |
+| **终止条件** | 当前 milestone 全部 WU integrated 且无 pending milestone → `COMPLETE`（输出总结，停止） |
+| **停等条件** | 仅在 BLOCK / `next_action=await_user` / Help Gradient "判断" / "需要你" 时停止 |
 | **Heartbeat 不停** | Heartbeat 汇报后继续推进，除非 heartbeat 中明确声明了停等条件 |
-| **上下文耗尽** | 接近窗口上限时主动 RECORD 当前进度再继续，而非静默停止 |
-| **强制 rotate** | `_session_wu_count ≥ 2` 或上下文 ≤ 25% 时，`transition_state.py` 硬拒绝 `→ EXECUTE`，必须先 rotate |
-| **禁止空转** | 无新目标时不得为了"遵守自治循环"而重复读文档、找任务 |
+| **上下文耗尽** | 接近窗口上限时 `transition_state.py` 硬拒绝 `→ EXECUTE`（`_is_context_critical()`），必须先 rotate |
+| **强制 rotate** | `_session_wu_count ≥ 6` 或上下文 ≤ 25% 时，`transition_state.py` 硬拒绝 `→ EXECUTE`，必须先 rotate |
+| **禁止空转** | `next_action=milestone_complete` 时不得为了"遵守自治循环"而重复读文档、找任务——直接 COMPLETE |
 
 ## 终止态（COMPLETE）
 

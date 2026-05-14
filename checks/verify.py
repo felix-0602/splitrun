@@ -2,6 +2,7 @@
 DEEPSHIP framework self-verification.
 Zero external dependencies. Run from repo root:
   python checks/verify.py
+Companion: checks/gap_scan.py (L3 design-implementation consistency scanner).
 """
 import os, re, sys, json
 from pathlib import Path
@@ -702,6 +703,56 @@ def check_protocol_integrity():
             err(f"protocol/policy.md contains weakening phrase: '{phrase}' — protocol MUST NOT weaken its own authority")
     ok("protocol/policy.md: no weakening language")
 
+# ─── check 11: orphan file detection ───
+def check_orphan_files():
+    print("\n[11] Orphan file detection (checks/, adapters/)")
+    scan_dirs = ["checks", "adapters"]
+    exts = {".py", ".js", ".ts"}
+    orphan_count = 0
+
+    for scan_dir_name in scan_dirs:
+        scan_dir = ROOT / scan_dir_name
+        if not scan_dir.exists():
+            continue
+        for fp in scan_dir.rglob("*"):
+            if fp.is_dir() or fp.suffix not in exts:
+                continue
+            if "__pycache__" in str(fp):
+                continue
+            rel = str(fp.relative_to(ROOT)).replace("\\", "/")
+            fname = fp.name
+
+            # Check if this file is referenced in any .md or .py file
+            referenced = False
+            for ref_file in ROOT.rglob("*.md"):
+                try:
+                    if fname in ref_file.read_text(encoding="utf-8", errors="replace"):
+                        referenced = True
+                        break
+                except Exception:
+                    continue
+            if not referenced:
+                for ref_file in ROOT.rglob("*.py"):
+                    if ref_file == fp:
+                        continue
+                    try:
+                        if fname in ref_file.read_text(encoding="utf-8", errors="replace"):
+                            referenced = True
+                            break
+                    except Exception:
+                        continue
+
+            if referenced:
+                ok(f"{rel} — referenced")
+            else:
+                orphan_count += 1
+                warn(f"{rel} — ORPHAN: not referenced in any .md or .py file")
+
+    if orphan_count == 0:
+        ok("no orphan files detected")
+    else:
+        err(f"{orphan_count} orphan file(s) — consider adding to CLAUDE.md, README, or verify.py")
+
 # ─── main ───
 if __name__ == "__main__":
     os.chdir(str(ROOT))
@@ -716,6 +767,7 @@ if __name__ == "__main__":
     check_work_unit_protocol()
     check_conformance_tests()
     check_protocol_integrity()
+    check_orphan_files()
 
     print(f"\n{'='*40}")
     print(f"Errors: {len(errors)} | Warnings: {len(warnings)}")

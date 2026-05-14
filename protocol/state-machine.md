@@ -37,13 +37,32 @@ BLOCK → （等待外部解除后 → READ_CONTEXT）
 COMPLETE → （终态，等待用户新请求 → READ_CONTEXT）
 ```
 
+## Profile-Aware 状态子集
+
+> 权威 profile 定义见 `rules/profiles.md`。本节定义 profile 对应的合法转移覆盖。
+
+| Profile | 状态子集 | 说明 |
+|---------|---------|------|
+| `development` | 全 11 状态 | 标准转移表不变 |
+| `deployment` | READ_CONTEXT, EXECUTE, RECORD, ADVANCE | READ_CONTEXT 后直接 → EXECUTE（跳过 5 状态） |
+| `debug` | READ_CONTEXT, MAP_REALITY, EXECUTE, VALIDATE, RECORD, ADVANCE | 跳过 CLARIFY/MILESTONE/PLAN |
+| `skill` | 无状态机 | 所有工具放行 |
+| `learning` | 无状态机 | 所有工具放行 |
+
+**Profile 覆盖转移规则**：当 `state.json` 中 `active_profile` 为非 `development` 时，legal_transitions 表按下表覆盖：
+
+| Profile | 覆盖转移 |
+|---------|---------|
+| `deployment` | READ_CONTEXT → EXECUTE（允许跳过中间状态） |
+| `debug` | READ_CONTEXT → MAP_REALITY（跳过 CLARIFY_INTENT） |
+
 ## Guard 条件
 
 转移前必须满足：
 
 | 转移 | Guard |
 |------|-------|
-| → EXECUTE | `current_work_unit` 非空，`files_allowed` 已定义 |
+| → EXECUTE | `current_work_unit` 非空，`files_allowed` 已定义；非 development profile 时可从 READ_CONTEXT 直入 |
 | → VALIDATE | 当前 WU 的 acceptance_tests 至少运行过一次 |
 | → ADVANCE | 当前 milestone 所有 WU 状态为 `integrated` |
 | → COMPLETE | 所有 milestone 完成 且 所有 WU `integrated`（或无 WU 文档任务） |

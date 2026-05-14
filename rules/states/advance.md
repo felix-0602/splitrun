@@ -30,13 +30,13 @@
   - [产品级问题，不能代你判断；无则写"无"]
 ```
 
-## 完成后（可恢复分段自治 — 条件推进）
+## 完成后（可恢复分段自治 — 自动续推）
 
-- [ ] 标记当前 milestone / work unit 完成
-- [ ] 检查 `.deepship/work_units.json`：是否有非终态 WU？
-  - `pending` / `in_progress` → 进入下一轮 READ_CONTEXT（依赖满足时）
-  - `done`（子代理返回但未集成）→ 必须先集成（RECORD），禁止直接 ADVANCE
-  - `blocked` / `failed` → 先处理阻塞或回 PLAN_STEP 重新拆解
-  - 全部 `integrated` + 有 pending milestone → SELECT_MILESTONE
-  - 全部 `integrated` + 无 pending milestone → `COMPLETE`
-- [ ] **禁止**在无任务时自动进入 READ_CONTEXT（空转）
+ADVANCE 完成后，transition_state.py 自动检测 `work_units.json` 中 pending WU 并写入 `state.json`：
+
+- [ ] 检查 `state.json` 的 `next_action` 字段（由 transition_state.py ADVANCE guard 自动写入）
+  - `continue_next_wu` → **必须**在 READ_CONTEXT 后立即进入 EXECUTE（`next_wu` 指向下一个 WU），不允许等待用户输入
+  - `await_user` → `continuation_mode` 非 normal，暂停等待用户确认
+  - `blocked_on_deps` → 检查 `_blocked_wus`，先处理依赖阻塞再继续
+  - `milestone_complete` → 当前 milestone 全部 WU integrated，进入 SELECT_MILESTONE 或 COMPLETE
+- [ ] `continuation_mode: normal` 的 WU 链路**自动推进**——这是 block 纪律级别的强制规则，不依赖模型判断

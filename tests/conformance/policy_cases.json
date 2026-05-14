@@ -26,6 +26,14 @@
     {"name":"workspace外文件拒绝","state":"EXECUTE","tool":"write_file","args":{"file_path":"/tmp/outside.py","content":"x"},"work_unit":{"id":"WU3","files_allowed":["/tmp/outside.py"]},"workspace":"/ws","expected":"BLOCK","reason":"即使在files_allowed内，也不能写workspace外文件"},
     {"name":"workspace内文件允许","state":"EXECUTE","tool":"edit_file","args":{"file_path":"/ws/README.md","old_string":"old","new_string":"new"},"work_unit":{"id":"WU2","files_allowed":["/ws/README.md"]},"workspace":"/ws","expected":"ALLOW","reason":"在workspace内且在WU中"},
     {"name":"COMPLETE 拒绝一切","state":"COMPLETE","tool":"write_file","args":{"file_path":"/ws/a.py","content":"x"},"expected":"BLOCK","reason":"COMPLETE是终态"},
-    {"name":"BLOCK 允许只读","state":"BLOCK","tool":"grep","args":{"pattern":"err"},"expected":"ALLOW","reason":"阻塞时仍可排查"}
+    {"name":"BLOCK 允许只读","state":"BLOCK","tool":"grep","args":{"pattern":"err"},"expected":"ALLOW","reason":"阻塞时仍可排查"},
+    {"name":"profile=skill write_file ALLOW","state":"EXECUTE","tool":"write_file","args":{"file_path":"/ws/a.py","content":"x"},"active_profile":"skill","expected":"ALLOW","reason":"skill profile 绕过状态机，所有工具放行"},
+    {"name":"profile=skill transition BLOCK","state":"EXECUTE","tool":"transition_state","args":{"target":"COMPLETE"},"active_profile":"skill","expected":"ALLOW","reason":"skill profile 全放行包括 transition"},
+    {"name":"profile=learning bash ALLOW","state":"READ_CONTEXT","tool":"bash","args":{"command":"npm test"},"active_profile":"learning","expected":"ALLOW","reason":"learning profile 绕过状态机全放行"},
+    {"name":"profile=learning write_file ALLOW","state":"READ_CONTEXT","tool":"write_file","args":{"file_path":"/ws/a.py","content":"x"},"active_profile":"learning","expected":"ALLOW","reason":"learning profile 不拦截写操作"},
+    {"name":"profile=deployment READ_CONTEXT→EXECUTE ALLOW","state":"READ_CONTEXT","tool":"transition_state","args":{"target":"EXECUTE"},"active_profile":"deployment","expected":"ALLOW","reason":"deployment 允许 READ_CONTEXT 直通 EXECUTE"},
+    {"name":"profile=deployment EXECUTE write ALLOW","state":"EXECUTE","tool":"write_file","args":{"file_path":"/ws/deploy.sh","content":"echo ok"},"work_unit":{"id":"WU-DEP01","files_allowed":["/ws/deploy.sh"]},"active_profile":"deployment","expected":"ALLOW","reason":"deployment EXECUTE 仍受 files_allowed 限制但允许写"},
+    {"name":"profile=debug READ_CONTEXT→MAP_REALITY ALLOW","state":"READ_CONTEXT","tool":"transition_state","args":{"target":"MAP_REALITY"},"active_profile":"debug","expected":"ALLOW","reason":"debug 允许跳过 CLARIFY_INTENT 直接 MAP_REALITY"},
+    {"name":"profile=debug MAP_REALITY 拒绝写","state":"MAP_REALITY","tool":"write_file","args":{"file_path":"/ws/a.py","content":"x"},"active_profile":"debug","expected":"BLOCK","reason":"debug profile 保留 MAP_REALITY 只读约束"}
   ]
 }

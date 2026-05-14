@@ -100,6 +100,20 @@
 - [ ] 不加"以后可能用"的抽象
 - [ ] 不用空 `except:` / `catch {}`
 - [ ] 子代理不得超出 `files_allowed` 范围
+- [ ] **需要改 files_allowed 外的文件？→ 走完整循环，不要绕过门禁**（见下方）
+
+## Scope 扩展：EXECUTE 中需要改 WU 范围外的文件
+
+**这是正常路径，不是异常。** 不要用 Bash heredoc / python -c / 直接 Edit state.json 绕过。
+
+1. 确认当前 WU 实际进度
+2. 给当前 WU 加 `review_status: "skipped"` + `review_evidence: "scope extension"`
+3. 走 `VALIDATE → RECORD → ADVANCE → READ_CONTEXT`
+4. 新循环中 `PLAN_STEP` 创建 WU，`files_allowed` 包含你需要的所有文件
+5. 回到 `EXECUTE` 继续
+
+**反例**：用 Bash heredoc 绕过 Write hook 写代码文件
+**后果**：WU 边界形同虚设 → diff 范围失控 → 无法回答"这个改动属于哪个 WU"
 
 ## 退出条件
 

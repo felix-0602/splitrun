@@ -24,6 +24,7 @@ DEEPSHIP Claude Code Adapter — PreToolUse Gate Hook（参考实现，非权威
 """
 import json
 import sys
+import fnmatch
 from pathlib import Path
 
 
@@ -34,6 +35,7 @@ READONLY_TOOLS = {"read", "grep", "glob", "task", "skill", "read_file"}
 TRANSITION_TOOLS = {"transitionstate", "transition_state"}
 
 EXECUTE_STATES = {"EXECUTE", "REPAIR"}
+ACTIVE_LANE_STATUSES = {"active", "pending", "executing", "in_progress"}
 
 # 文件分类
 DEEPSHIP_STATE_FILES = ["state.json", "work_units.json", "log.jsonl"]
@@ -59,6 +61,17 @@ def load_work_units() -> list[dict]:
     return []
 
 
+def find_deepship_root(workspace: str | None = None) -> Path | None:
+    candidates = []
+    if workspace:
+        candidates.append(Path(workspace))
+    candidates.extend([Path.cwd(), *Path.cwd().parents])
+    for root_candidate in candidates:
+        if (root_candidate / ".deepship").exists():
+            return root_candidate
+    return None
+
+
 def get_current_work_unit(state: dict, wus: list) -> dict | None:
     wu_id = state.get("current_work_unit", "")
     if not wu_id:
@@ -75,6 +88,75 @@ def path_in_workspace(file_path: str, workspace: str | None) -> bool:
     normalized_file = file_path.replace("\\", "/").rstrip("/")
     normalized_ws = workspace.replace("\\", "/").rstrip("/")
     return normalized_file == normalized_ws or normalized_file.startswith(normalized_ws + "/")
+
+
+def _normalize_claim_path(path: str, root: Path | None) -> str:
+    raw = str(path).replace("\\", "/").strip()
+    if not raw:
+        return ""
+    if root:
+        try:
+            p = Path(path)
+            if p.is_absolute():
+                return p.resolve().relative_to(root.resolve()).as_posix()
+        except (OSError, ValueError):
+            pass
+    return raw.lstrip("./")
+
+
+def _claim_matches(pattern: str, target: str) -> bool:
+    pattern = pattern.replace("\\", "/").rstrip("/")
+    target = target.replace("\\", "/").rstrip("/")
+    if not pattern or not target:
+        return False
+    if any(ch in pattern for ch in "*?[]"):
+        return fnmatch.fnmatch(target, pattern)
+    return target == pattern or target.startswith(pattern + "/")
+
+
+def _path_in_list(file_path: str, allowed_paths: list[str], root: Path | None) -> bool:
+    target = _normalize_claim_path(file_path, root)
+    return any(_claim_matches(_normalize_claim_path(path, root), target) for path in allowed_paths)
+
+
+def _revolution_allows(file_path: str, state: dict, wu: dict | None) -> bool:
+    token = {}
+    if wu and isinstance(wu.get("revolution"), dict):
+        token = wu["revolution"]
+    elif isinstance(state.get("revolution"), dict):
+        token = state["revolution"]
+    if token.get("status") != "approved":
+        return False
+    allowed_paths = token.get("allowed_paths", [])
+    if not isinstance(allowed_paths, list):
+        return False
+    root = find_deepship_root(state.get("workspace"))
+    return _path_in_list(file_path, allowed_paths, root)
+
+
+def _active_lane_file_conflict(file_path: str, state: dict) -> str | None:
+    root = find_deepship_root(state.get("workspace"))
+    if root is None:
+        return None
+    index_path = root / ".deepship" / "lanes" / "index.json"
+    if not index_path.exists():
+        return None
+    try:
+        index = json.loads(index_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    current_lane_id = state.get("lane_id")
+    target = _normalize_claim_path(file_path, root)
+    for lane_id, info in index.items():
+        if lane_id == current_lane_id:
+            continue
+        if info.get("status") not in ACTIVE_LANE_STATUSES:
+            continue
+        for claimed in info.get("files_claimed", []):
+            claimed_path = _normalize_claim_path(claimed, root)
+            if _claim_matches(claimed_path, target):
+                return lane_id
+    return None
 
 
 def _write_kind(file_path: str, root: str | None) -> str:
@@ -106,9 +188,24 @@ def _write_kind(file_path: str, root: str | None) -> str:
 
 
 def evaluate(tool_name: str, args: dict, state: dict, wu: dict | None) -> tuple[bool, str]:
-    """DEEPSHIP 策略评估（写分类 + 阶段门禁）。"""
+    """DEEPSHIP 策略评估（写分类 + 阶段门禁 + profile 感知）。"""
     current_state = state.get("current_state", "READ_CONTEXT")
+    active_profile = state.get("active_profile", "development")
     tool_key = tool_name.lower()
+
+    # Gate -1: Profile 覆盖 —— skill/learning 全放行（安全触发词除外）
+    if active_profile in ("skill", "learning"):
+        return True, f"profile={active_profile} — 所有工具放行"
+
+    # Gate -0.5: deployment/debug profile 允许跳过状态的转移
+    if active_profile == "deployment" and tool_key in TRANSITION_TOOLS:
+        target = args.get("target") or args.get("to") or ""
+        if current_state == "READ_CONTEXT" and target == "EXECUTE":
+            return True, f"profile=deployment — READ_CONTEXT → EXECUTE 直通"
+    if active_profile == "debug" and tool_key in TRANSITION_TOOLS:
+        target = args.get("target") or args.get("to") or ""
+        if current_state == "READ_CONTEXT" and target == "MAP_REALITY":
+            return True, f"profile=debug — READ_CONTEXT → MAP_REALITY 直通"
 
     # Gate 0: COMPLETE 终态
     if current_state == "COMPLETE":
@@ -140,6 +237,13 @@ def evaluate(tool_name: str, args: dict, state: dict, wu: dict | None) -> tuple[
             "COMPLETE":         {"READ_CONTEXT"},
         }
 
+        # Profile 覆盖：扩展合法转移表
+        if active_profile == "deployment":
+            legal_transitions["READ_CONTEXT"] = {"EXECUTE"}
+        elif active_profile == "debug":
+            legal_transitions["READ_CONTEXT"] = {"MAP_REALITY"}
+            legal_transitions["MAP_REALITY"] = {"EXECUTE", "BLOCK"}
+
         allowed_targets = legal_transitions.get(current_state, set())
         if target not in allowed_targets:
             legal = ", ".join(sorted(allowed_targets)) if allowed_targets else "（终态）"
@@ -165,6 +269,9 @@ def evaluate(tool_name: str, args: dict, state: dict, wu: dict | None) -> tuple[
         # 工作区边界
         if not path_in_workspace(fp, workspace):
             return False, f"文件 {fp} 不在 workspace {workspace} 内"
+
+        if current_state == "PLAN_STEP" and _revolution_allows(fp, state, wu):
+            return True, f"PLAN_STEP revolution approved path: {fp}"
 
         # ── 按状态 + 写分类放行 ──
 
@@ -209,6 +316,9 @@ def evaluate(tool_name: str, args: dict, state: dict, wu: dict | None) -> tuple[
                         )
                         if not matched:
                             return False, f"文件 {fp} 不在当前 WU files_allowed 中"
+                conflict_lane = _active_lane_file_conflict(fp, state)
+                if conflict_lane:
+                    return False, f"文件 {fp} 已被活跃 lane {conflict_lane} claim"
                 return True, f"{current_state} 允许改代码: {fp}"
             # EXECUTE 中的 doc_write
             return True, f"{current_state} 允许写文档: {fp}"

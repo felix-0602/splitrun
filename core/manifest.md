@@ -15,6 +15,7 @@
 | 项目计划 | `Plan.md` |
 | 项目记录 | `Documentation.md` |
 | JIT 检查表 | `rules/states/` 对应状态文件 |
+| Intent-Aware Profile | `rules/profiles.md` |
 | 自治约束 | `rules/static/loop.md` |
 
 ## 状态机（详见 `protocol/state-machine.md`）

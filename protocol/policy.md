@@ -45,6 +45,19 @@
 3. `file_path` 在 `workspace` 边界内（如配置了 workspace）
 4. 不满足任一条件 → BLOCK
 
+## Profile 权限覆盖规则
+
+> 权威 profile 定义见 `rules/profiles.md`。当 `state.json` 中 `active_profile` 非空且非 `development` 时，以下规则覆盖状态→权限矩阵。
+
+| Profile | 覆盖规则 |
+|---------|---------|
+| `skill` | **所有工具 ALLOW**。不检查状态门禁、WU 边界、files_allowed。安全触发词（auth/DB/API/加密/支付）仍触发 security-reviewer。 |
+| `learning` | **所有工具 ALLOW**。规则同 skill。 |
+| `deployment` | READ_CONTEXT → EXECUTE 直通：READ_CONTEXT 中允许 exec（deploy/build 命令）。EXECUTE/RECORD/ADVANCE 按原矩阵。跳过 MAP/PLAN/VALIDATE 对应的 code_write 限制。 |
+| `debug` | READ_CONTEXT → MAP_REALITY 直通：跳过 CLARIFY/MILESTONE/PLAN 的 code_write 限制。MAP_REALITY 和 VALIDATE 的权限按原矩阵保留。 |
+
+**实现要求**：Policy Engine 的 `evaluate()` 必须在检查状态权限矩阵**之前**先检查 `active_profile`。skill/learning profile 直接返回 ALLOW（除安全触发词外）。
+
 ## 状态边界补充规则
 
 - `READ_CONTEXT` MAY 读取 `.deepship/*`、Prompt、Plan、Documentation，执行 `read_exec`（只读 bash：ls, git status, npm list 等），响应用户显式 `skill_user` 调用；MUST NOT 写项目代码、执行 `exec`（副作用 bash）、或 `skill_auto`（自动搜索匹配技能）

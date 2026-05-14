@@ -27,6 +27,7 @@ class ClaudeCodeHookPolicyConformance(unittest.TestCase):
                 "current_state": case["state"],
                 "workspace": case.get("workspace"),
                 "validation_status": case.get("args", {}).get("validation_status"),
+                "active_profile": case.get("active_profile", "development"),
             }
             wu = case.get("work_unit")
             allowed, reason = hook.evaluate(case["tool"], case["args"], state, wu)
