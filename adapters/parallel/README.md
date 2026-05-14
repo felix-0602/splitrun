@@ -101,11 +101,21 @@ Collector 逐项验证：
 
 合并用 `--apply` 显式触发：从 worktree 生成 patch → `git apply` 到主仓库。`--cleanup` 必须在 `--apply` 成功后才会执行，防止未合并就清理导致改动丢失。
 
-## Fork 和 Rotate 的区别
+## Fork、Rotate 和 Lane 的区别
 
-Fork 和 Rotate 解决不同问题：
+三者解决不同问题：
 
-- **fork**：多个 WU 并行执行
+- **fork**：多个 WU 并行执行（dispatcher 批量分派，非交互）
 - **rotate**：单个长任务在安全点保存 checkpoint，换新会话继续
+- **lane**：即时创建隔离工作通道（spawn_lane 交互式，"想到就开"）
 
 本适配器实现 fork。Rotate 走 continuation/checkpoint 流程，不走 collector 路径。
+
+## Lane 即时创建
+
+```bash
+# 创建交互式 lane（worktree + 独立 CC 会话）
+python adapters/parallel/spawn_lane.py --task "重构 gate hook" --files rules/states/execute.md
+```
+
+Lane 与 dispatcher 互补：dispatcher 批量分派预定义 WU（`claude -p` 非交互），spawn_lane 即时创建交互式 lane。lane 内自动写 `lane_id.json` 做身份发现，gate hook 通过 `index.json` 做文件冲突检测。
