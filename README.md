@@ -53,47 +53,54 @@ DEEPSHIP 加一套工程纪律：**每一步都能恢复、能审计、能拒绝
 
 ## 执行流程
 
-```
-用户任务
-  │
-  ▼
-READ_CONTEXT ──→ 读项目文件 + .deepship 状态 + 选择 Profile
-  │
-  ├─ profile=deployment ──→ EXECUTE（直通）
-  ├─ profile=skill/learning ──→ 全放行（绕过状态机）
-  │
-  ▼ （默认 development 路径）
-CLARIFY_INTENT (optional)
-  │
-  ▼
-MAP_REALITY ──→ 勘察代码库现状（Reality-First）
-  │
-  ▼
-SELECT_MILESTONE → PLAN_STEP ──→ 拆分 Work Unit，标记 execution_mode + continuation_mode
-  │
-  ├── execution_mode=inline ──→ 主线程执行
-  ├── execution_mode=serial ──→ 单工作流执行
-  └── execution_mode=fork   ──→ Dispatcher 创建 worktree，并行分派
-  │
-  ▼
-EXECUTE ──→ 只改 files_allowed 内的文件（越界 → 走 scope 扩展流程回 PLAN_STEP）
-  │
-  ├── continuation_mode=rotatable + 安全点 → 写 continuation.md → Rotate → 新会话接管
-  │
-  ▼
-VALIDATE ──→ 全局测试 / 类型检查 / 构建
-  │ 失败 → REPAIR（≤3轮）→ 回 VALIDATE
-  │ 计划错 → 回 PLAN_STEP
-  │
-  ▼
-RECORD ──→ 写入 state.json + work_units.json + log.jsonl
-  │
-  ▼
-ADVANCE ──→ 检查 pending WU
-  │  有 pending + continuation_mode=normal → 自动设 next_action=continue_next_wu → READ_CONTEXT
-  │  有 pending + continuation_mode=await_user → 暂停等用户确认
-  │  全部 integrated + 有 pending milestone → SELECT_MILESTONE
-  │  全部 integrated + 无 pending milestone → COMPLETE
+```mermaid
+flowchart TD
+  U["用户任务"] --> RC
+
+  subgraph PROFILE["Profile 选择（READ_CONTEXT 阶段）"]
+    RC["READ_CONTEXT<br/>读项目文件 + .deepship 状态<br/>+ rules/profiles.md"]
+  end
+
+  RC -->|"deployment"| EXEC
+  RC -->|"skill / learning"| FREE["全放行<br/>绕过状态机"]
+  RC -->|"development（默认）"| CI
+
+  CI["CLARIFY_INTENT<br/>（optional）"]
+  CI --> MR["MAP_REALITY<br/>勘察代码库现状<br/>Reality-First 不可跳过"]
+  MR --> SM["SELECT_MILESTONE"]
+  SM --> PS["PLAN_STEP<br/>拆分 Work Unit<br/>标记 execution_mode + continuation_mode"]
+
+  PS -->|"inline / serial"| EXEC
+  PS -->|"fork"| DISP["Dispatcher<br/>创建 git worktree"]
+  DISP --> WORKER["Worker 子会话<br/>一个 WU 一个 worktree"]
+  WORKER -->|"rotatable + 安全点"| ROT["写 continuation.md<br/>→ Rotate 新会话接管"]
+  ROT --> RC
+  WORKER -->|"完成"| RESULT["写入 result.json"]
+  RESULT --> COLLECTOR["Collector<br/>边界 / 测试 / 冲突检查"]
+
+  EXEC["EXECUTE<br/>只改 files_allowed 内文件"]
+
+  EXEC -->|"越界 → scope 扩展流程"| PS
+  EXEC -->|"rotatable + 安全点"| ROT2["写 continuation.md<br/>→ Rotate 新会话接管"]
+  ROT2 --> RC
+
+  COLLECTOR -->|"通过"| VAL
+  COLLECTOR -->|"实现 bug"| REP
+  COLLECTOR -->|"边界/计划错"| PS
+  EXEC --> VAL
+
+  VAL["VALIDATE<br/>全局测试 / 类型检查 / 构建"]
+  VAL -->|"失败，可修"| REP["REPAIR<br/>≤3 轮"]
+  REP --> VAL
+  VAL -->|"失败，计划错"| PS
+  VAL -->|"通过"| REC["RECORD<br/>写入 state.json + work_units.json + log.jsonl"]
+
+  REC --> ADV["ADVANCE<br/>检查 pending WU"]
+  ADV -->|"next_action=continue_next_wu<br/>（自动续推，block 纪律）"| RC
+  ADV -->|"next_action=await_user"| WAIT["暂停等用户确认"]
+  ADV -->|"blocked_on_deps"| PS
+  ADV -->|"全部 integrated<br/>+ 有 pending milestone"| SM
+  ADV -->|"全部 integrated<br/>+ 无 pending milestone"| DONE["COMPLETE"]
 ```
 
 关键区分——两轴模型：
