@@ -1,9 +1,8 @@
-"""Dynamic new-session arbitration for DEEPSHIP.
+"""DEEPSHIP 新会话动态仲裁。
 
-This module does not pre-assign milestones to lanes. It handles the moment a
-new conversation enters a project that may already have an active owner. The
-output is a decision: stop as duplicate, hand work to the owner, create a plan
-revision and lane contract, or ask the owner to stop and replan.
+不预分配 milestone 给 lane。当新会话进入已有活跃 owner 的项目时介入。
+输出仲裁决策：重复请求停止、移交工作给 owner、创建计划修订和 lane 合约、
+或要求 owner 停止并重新规划。
 """
 
 from __future__ import annotations

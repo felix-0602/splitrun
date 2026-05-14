@@ -1,11 +1,11 @@
-// DEEPSHIP Coordination Guard — lane contracts, session ownership, WU integrity, transition validation.
-// Requires policy-gate.js.
+// DEEPSHIP Coordination Guard — lane 合约、session 所有权、WU 完整性、转移校验。
+// 依赖 policy-gate.js。
 
 var pg = require('./policy-gate.js');
 var path = require('path');
 var fs = require('fs');
 
-// ── Transition validation ─────────────────────────────────
+// ── 转移校验 ──────────────────────────────────────────────
 
 var TRANSITION_TOOLS = new Set(['transition_state', 'transitionstate', 'TransitionState']);
 var LEGAL_TRANSITIONS = {
@@ -36,7 +36,7 @@ function validateTransition(root, toolInput) {
   return null;
 }
 
-// ── Work unit helpers ─────────────────────────────────────
+// ── Work Unit 辅助函数 ─────────────────────────────────────
 
 function parseJsonText(value) {
   if (typeof value !== 'string' || !value.trim()) return null;
@@ -52,7 +52,7 @@ function workUnitIds(data) {
   return new Set(ids);
 }
 
-// ── Lane helpers ──────────────────────────────────────────
+// ── Lane 辅助函数 ──────────────────────────────────────────
 
 function activeLanes(root) {
   var registry = pg.readJson(path.join(root, '.deepship', 'lanes.json'));
@@ -90,7 +90,7 @@ function laneHasA2AContract(root, laneName) {
   } catch (_) { return false; }
 }
 
-// ── Lane guards ───────────────────────────────────────────
+// ── Lane 守卫 ──────────────────────────────────────────────
 
 function laneCreationContractViolation(target, root) {
   var laneName = laneNameFromPath(target, root);
@@ -108,7 +108,7 @@ function laneMetadataDirectWriteViolation(target, root, cwd) {
   return lane.name || lane.worktree_path || 'unknown';
 }
 
-// ── Session ownership ────────────────────────────────────
+// ── 会话所有权 ────────────────────────────────────────────
 
 function requiresRootSessionOwner(target, root, cwd) {
   if (!pg.isRootMetadataFile(target, root)) return null;
@@ -123,7 +123,7 @@ function requiresRootSessionOwner(target, root, cwd) {
   return null;
 }
 
-// ── WU integrity ──────────────────────────────────────────
+// ── WU 完整性 ─────────────────────────────────────────────
 
 var LEGAL_WU_STATUS_TRANSITIONS = {
   pending: new Set(['pending', 'in_progress', 'blocked', 'failed']),
@@ -178,7 +178,7 @@ function workUnitsIntegrityViolation(target, root, toolInput) {
   return null;
 }
 
-// ── Lane collision guards ─────────────────────────────────
+// ── Lane 冲突守卫 ──────────────────────────────────────────
 
 function activeLaneMetadataCollision(target, root, toolInput) {
   if (!pg.isRootMetadataFile(target, root)) return null;
@@ -226,7 +226,7 @@ function activeLaneCollision(target, root, toolInput) {
     var laneIds = workUnitIds(laneWorkUnits);
     laneIds.forEach(function(id) { if (proposedIds.has(id)) return lane.name || lane.worktree_path || 'unknown'; });
   }
-  // Re-check manually due to forEach limitation
+  // forEach 闭包限制，需手动复查
   for (var j = 0; j < lanes.length; j++) {
     var ln = lanes[j];
     var lh = ln.lane_home || (ln.worktree_path ? path.join(ln.worktree_path, '.deepship') : null);

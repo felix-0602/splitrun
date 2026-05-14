@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Claude Code statusLine renderer for DEEPSHIP projects."""
+"""DEEPSHIP 项目的 Claude Code 状态栏渲染器。"""
 
 from __future__ import annotations
 

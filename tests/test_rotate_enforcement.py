@@ -38,11 +38,11 @@ class RotateEnforcementTest(unittest.TestCase):
             indent=2,
         ), encoding="utf-8")
 
-    def test_session_wu_count_blocks_third_wu_when_remaining(self):
-        """_session_wu_count >= 2 with remaining pending WUs → blocked."""
+    def test_session_wu_count_blocks_at_six(self):
+        """_session_wu_count >= 6 with remaining pending WUs → blocked."""
         self._write_state({
             "current_state": "PLAN_STEP",
-            "_session_wu_count": 2,
+            "_session_wu_count": 6,
             "current_work_unit": "WU-T02",
         })
 
@@ -51,10 +51,10 @@ class RotateEnforcementTest(unittest.TestCase):
         self.assertIn("rotate", result["reason"])
 
     def test_session_wu_count_allows_when_no_remaining(self):
-        """_session_wu_count >= 2 but no other pending WUs → allowed."""
+        """_session_wu_count >= 6 but no other pending WUs → allowed."""
         self._write_state({
             "current_state": "PLAN_STEP",
-            "_session_wu_count": 2,
+            "_session_wu_count": 6,
             "current_work_unit": "WU-T02",
         })
         self._write_wus([
@@ -69,11 +69,11 @@ class RotateEnforcementTest(unittest.TestCase):
         result = transition_state.transition("EXECUTE", wu_id="WU-T03", project_root=self.root)
         self.assertTrue(result["success"], f"Expected allow, got: {result}")
 
-    def test_session_wu_count_allows_first_two_wus(self):
-        """_session_wu_count = 0 or 1 → always allowed."""
+    def test_session_wu_count_allows_below_six(self):
+        """_session_wu_count = 5 → allowed (below threshold)."""
         self._write_state({
             "current_state": "PLAN_STEP",
-            "_session_wu_count": 1,
+            "_session_wu_count": 5,
             "current_work_unit": "WU-T01",
         })
 

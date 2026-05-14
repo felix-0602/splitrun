@@ -1,4 +1,4 @@
-"""DEEPSHIP session ownership manager."""
+"""DEEPSHIP 会话所有权管理器。"""
 
 from __future__ import annotations
 

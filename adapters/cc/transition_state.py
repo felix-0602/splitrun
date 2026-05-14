@@ -78,20 +78,23 @@ def _check_guard(
         if not current_wu.get("files_allowed"):
             return False, f"{current_wu_id} 的 files_allowed 为空"
 
-        # rotate 强制门禁：同一会话完成 ≥2 个 WU 后必须 rotate
+        # rotate 门禁：上下文驱动（主要）+ counter 安全网（bridge file 不可用时）
         session_wu_count = state.get("_session_wu_count", 0)
         remaining = [w for w in wus if w.get("status") == "pending" and w["id"] != current_wu_id]
-        if session_wu_count >= 2 and remaining:
+        context_critical = _is_context_critical()
+
+        if context_critical:
             return False, (
-                f"同一会话已完成 {session_wu_count} 个 WU，还有 {len(remaining)} 个待执行。"
-                "请先 rotate 再继续。运行: python adapters/parallel/rotate.py "
+                "上下文余量不足（剩余 ≤ 25%）——立即 rotate。"
+                "运行: python adapters/parallel/rotate.py "
                 "--diff-intent '<当前 diff>' --next-steps '<新会话下一步>'"
             )
 
-        # context-low 门禁：上下文压力过大时强制 rotate
-        if _is_context_critical():
+        # 安全网：context monitor 不可用时，counter ≥ 6 强制保底 rotate
+        if session_wu_count >= 6 and remaining:
             return False, (
-                "上下文余量不足（剩余 ≤ 25%）。请先 rotate 再继续。"
+                f"同一会话已完成 {session_wu_count} 个 WU（≥6），还有 {len(remaining)} 个待执行。"
+                "context monitor 未触发但 counter 已达上限——为防止上下文溢出，请先 rotate 再继续。"
                 "运行: python adapters/parallel/rotate.py "
                 "--diff-intent '<当前 diff>' --next-steps '<新会话下一步>'"
             )

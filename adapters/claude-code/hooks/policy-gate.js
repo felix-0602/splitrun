@@ -1,5 +1,5 @@
-// DEEPSHIP Policy Gate — base layer: permissions matrix, path classification, deny.
-// Required by boundary-guard.js and coordination-guard.js.
+// DEEPSHIP Policy Gate — 基础层：权限矩阵、路径分类、deny。
+// 被 boundary-guard.js 和 coordination-guard.js 引用。
 
 const fs = require('fs');
 const path = require('path');

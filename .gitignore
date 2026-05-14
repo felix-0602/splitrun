@@ -12,3 +12,5 @@ desktop.ini
 # Python caches
 __pycache__/
 *.py[cod]
+.deepship/*.bak
+.planning/

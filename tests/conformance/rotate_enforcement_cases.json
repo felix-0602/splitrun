@@ -2,15 +2,59 @@
   "version": "1.0",
   "description": "DEEPSHIP rotate enforcement conformance test suite.",
   "cases": [
-    {"name": "session_wu_count >= 2 with remaining pending WUs blocks EXECUTE", "session_wu_count": 2, "remaining_pending": 2, "expected": "BLOCK"},
-    {"name": "session_wu_count >= 2 with no remaining WUs allows EXECUTE", "session_wu_count": 2, "remaining_pending": 0, "expected": "ALLOW"},
-    {"name": "session_wu_count = 0 allows EXECUTE", "session_wu_count": 0, "remaining_pending": 3, "expected": "ALLOW"},
-    {"name": "session_wu_count = 1 allows EXECUTE", "session_wu_count": 1, "remaining_pending": 3, "expected": "ALLOW"},
-    {"name": "context critical blocks EXECUTE", "context_critical": true, "expected": "BLOCK"},
-    {"name": "context normal allows EXECUTE", "context_critical": false, "expected": "ALLOW"},
-    {"name": "COMPLETE archives milestone WUs", "to_state": "COMPLETE", "expected": "ARCHIVE_CREATED"},
-    {"name": "clear-rotation resets _session_wu_count to 0", "clear_rotation": true, "expected_session_wu_count": 0},
-    {"name": "auto-recover resets _session_wu_count to 0", "auto_recover": true, "expected_session_wu_count": 0},
-    {"name": "clear-interrupt resets _session_wu_count to 0", "clear_interrupt": true, "expected_session_wu_count": 0}
+    {
+      "name": "session_wu_count >= 6 with remaining pending WUs blocks EXECUTE",
+      "session_wu_count": 6,
+      "remaining_pending": 2,
+      "expected": "BLOCK"
+    },
+    {
+      "name": "session_wu_count >= 6 with no remaining WUs allows EXECUTE",
+      "session_wu_count": 6,
+      "remaining_pending": 0,
+      "expected": "ALLOW"
+    },
+    {
+      "name": "session_wu_count = 0 allows EXECUTE",
+      "session_wu_count": 0,
+      "remaining_pending": 3,
+      "expected": "ALLOW"
+    },
+    {
+      "name": "session_wu_count = 1 allows EXECUTE",
+      "session_wu_count": 1,
+      "remaining_pending": 3,
+      "expected": "ALLOW"
+    },
+    {
+      "name": "context critical blocks EXECUTE",
+      "context_critical": true,
+      "expected": "BLOCK"
+    },
+    {
+      "name": "context normal allows EXECUTE",
+      "context_critical": false,
+      "expected": "ALLOW"
+    },
+    {
+      "name": "COMPLETE archives milestone WUs",
+      "to_state": "COMPLETE",
+      "expected": "ARCHIVE_CREATED"
+    },
+    {
+      "name": "clear-rotation resets _session_wu_count to 0",
+      "clear_rotation": true,
+      "expected_session_wu_count": 0
+    },
+    {
+      "name": "auto-recover resets _session_wu_count to 0",
+      "auto_recover": true,
+      "expected_session_wu_count": 0
+    },
+    {
+      "name": "clear-interrupt resets _session_wu_count to 0",
+      "clear_interrupt": true,
+      "expected_session_wu_count": 0
+    }
   ]
 }

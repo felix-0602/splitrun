@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
-"""DEEPSHIP lane manager.
+"""DEEPSHIP lane 管理器。
 
-A lane is an isolated git worktree plus AI-readable runtime metadata.
-The lane path itself is the worktree root:
+lane 是隔离的 git worktree + AI 可读的运行期元数据。
+lane 路径本身即为 worktree 根目录：
 
     .deepship/lanes/<lane-name>/
 
-This keeps lane state discoverable through .deepship without scattering
-sibling directories beside the project.
+这让 lane 状态通过 .deepship 统一管理，不在项目旁边散落兄弟目录。
 """
 
 from __future__ import annotations

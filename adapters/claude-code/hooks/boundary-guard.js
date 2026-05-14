@@ -1,10 +1,10 @@
-// DEEPSHIP Boundary Guard — work unit boundary, Bash classification, anti-bypass.
-// Requires policy-gate.js.
+// DEEPSHIP Boundary Guard — Work Unit 边界、Bash 分类、反绕过。
+// 依赖 policy-gate.js。
 
 var pg = require('./policy-gate.js');
 var path = require('path');
 
-// ── Work unit boundary ───────────────────────────────────
+  // ── Work Unit 边界 ──────────────────────────────────────
 
 function globToRegExp(glob) {
   var escaped = glob.replace(/\\/g, '/').replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
@@ -29,7 +29,7 @@ function allowedByWorkUnit(target, root, workUnit) {
   });
 }
 
-// ── Bash classification ──────────────────────────────────
+  // ── Bash 分类 ───────────────────────────────────────────
 
 var READ_ONLY_PATTERNS = [
   /^git\s+status/, /^git\s+log/, /^git\s+diff/, /^git\s+show/,
@@ -100,7 +100,7 @@ function commandChainHasExec(command) {
   return parts.some(function(part) { return !isReadOnlyBash(part.trim()); });
 }
 
-// ── Anti-bypass: Bash file writes ─────────────────────────
+  // ── 反绕过：Bash 文件写入 ──────────────────────────────────
 
 function shellTokenPattern(target) {
   var escaped = target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\//g, '[\\\\/]');

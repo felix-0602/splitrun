@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// DEEPSHIP Policy Guard — PreToolUse hook for Write/Edit/MultiEdit.
-// Layered architecture: policy-gate → boundary-guard → coordination-guard.
+// DEEPSHIP Policy Guard — Write/Edit/MultiEdit 的 PreToolUse hook。
+// 分层架构：policy-gate → boundary-guard → coordination-guard。
 //
-// This is a Claude Code adapter guard, not the full DEEPSHIP runtime.
-// It only enforces projects that have a .deepship/ state directory.
+// 这是 Claude Code adapter 门禁，不是完整的 DEEPSHIP runtime。
+// 仅对有 .deepship/ 状态目录的项目生效。
 
 var pg = require('./policy-gate.js');
 var bg = require('./boundary-guard.js');
@@ -21,21 +21,21 @@ async function main() {
   var cwd = data.cwd || process.cwd();
   var root = pg.findProjectRoot(cwd);
 
-  // ── Transition validation ─────────────────────────────
+  // ── 转移校验 ──────────────────────────────────────────
   if (cg.TRANSITION_TOOLS.has(toolName)) {
     var transErr = cg.validateTransition(root, data.tool_input);
     if (transErr) { pg.deny(transErr, 'transition/legal'); return; }
     return;
   }
 
-  // ── Skill auto 拦截 ───────────────────────────────────
+  // ── Skill 自动调用拦截 ─────────────────────────────────
   if (toolName === pg.SKILL_TOOL && root) {
     var st = pg.readJson(path.join(root, '.deepship', 'state.json'));
     var cs = ((st && st.current_state) || 'READ_CONTEXT').toUpperCase();
     // CC PreToolUse hook 无法区分 skill_user vs skill_auto；仅记录警告不阻断
   }
 
-  // ── Bash exec 分类拦截 ────────────────────────────────
+  // ── Bash exec 分类拦截 ──────────────────────────────────
   if ((toolName === 'Bash' || toolName === 'bash') && root) {
     var cmd = (data.tool_input && data.tool_input.command || '').toString();
 
@@ -67,7 +67,7 @@ async function main() {
     }
   }
 
-  // ── Write/Edit gate ────────────────────────────────────
+  // ── Write/Edit 写门禁 ───────────────────────────────────
   if (!pg.WRITE_TOOLS.has(toolName)) return;
 
   var target = pg.getTargetPath(toolName, data.tool_input || {});
@@ -87,7 +87,7 @@ async function main() {
     return;
   }
 
-  // ── Coordination guards ────────────────────────────────
+  // ── 协作守卫 ────────────────────────────────────────────
   var err;
   err = cg.laneCreationContractViolation(targetAbs, root);
   if (err) { pg.deny("DEEPSHIP BLOCK: lane '" + err + "' cannot be created or written before an A2A contract exists in .deepship/a2a/.", 'coordination/lane-contract'); return; }
@@ -107,7 +107,7 @@ async function main() {
   err = cg.workUnitsIntegrityViolation(targetAbs, root, data.tool_input || {});
   if (err) { pg.deny('DEEPSHIP BLOCK: ' + err, 'coordination/wu-integrity'); return; }
 
-  // ── State-gated permission check ───────────────────────
+  // ── 状态门禁权限检查 ─────────────────────────────────────
   var statePath = path.join(root, '.deepship', 'state.json');
   var workUnitsPath = path.join(root, '.deepship', 'work_units.json');
   var state = pg.readJson(statePath);
@@ -140,7 +140,7 @@ async function main() {
     return;
   }
 
-  // ── Session ownership ──────────────────────────────────
+  // ── 会话所有权 ──────────────────────────────────────────
   var sessionPath = path.join(root, '.deepship', 'session.json');
   var session = pg.readJson(sessionPath);
   if (session && session.owner_worktree) {
@@ -158,7 +158,7 @@ async function main() {
     }
   }
 
-  // ── EXECUTE/REPAIR: work unit boundary ─────────────────
+  // ── EXECUTE/REPAIR：Work Unit 边界 ────────────────────────
   if (kind === 'code_write' && (currentState === 'EXECUTE' || currentState === 'REPAIR')) {
     if (pg.isMetadataWrite(targetAbs, root)) {
       pg.deny('DEEPSHIP BLOCK: EXECUTE/REPAIR cannot directly edit DEEPSHIP metadata; use RECORD.', 'policy/state-write');

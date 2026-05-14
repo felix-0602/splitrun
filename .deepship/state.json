@@ -1,11 +1,11 @@
 {
-  "current_state": "COMPLETE",
-  "current_milestone": "integration-hardening",
-  "current_work_unit": "WU-IH05",
+  "current_state": "EXECUTE",
+  "current_milestone": "rule-intents",
+  "current_work_unit": "WU-RI01",
   "validation_status": null,
   "created_at": "2026-05-12T00:00:00Z",
-  "updated_at": "2026-05-14T01:00:00Z",
-  "last_completed_state": "RECORD",
-  "next_action": "Fix hook WU integrity check + run untracked tests + refactor hook + fix R001/R002 + slim rules",
+  "updated_at": "2026-05-14T00:00:00Z",
+  "last_completed_state": "COMPLETE",
+  "next_action": "Create rules/intents/ + add rule-id to hook deny messages",
   "_session_wu_count": 0
 }
