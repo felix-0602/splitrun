@@ -9,6 +9,10 @@
 python -m py_compile adapters/parallel/dispatcher.py
 python -m py_compile adapters/parallel/collector.py
 python -m py_compile adapters/parallel/rotate.py
+python -m py_compile adapters/parallel/spawn_lane.py
+python -m py_compile adapters/cc/hooks/deepship_gate.py
+python -m py_compile adapters/cc/transition_state.py
+python -m py_compile checks/gap_scan.py
 
 # 无未跟踪的关键文件
 git status --short | grep -v "\.pyc\|__pycache__"

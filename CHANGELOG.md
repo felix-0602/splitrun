@@ -1,5 +1,48 @@
 # Changelog
 
+## [v2.3] — 2026-05-14
+
+### Intent-Aware Profiles
+
+- **5 个 profile**：`development`（完整 11 状态）、`deployment`（4 状态快速部署）、`debug`（保留 Reality-First 跳过规划）、`skill`（全放行）、`learning`（全放行）。`rules/profiles.md` 定义触发信号和行为规则。
+- **Profile-aware gate**：`deepship_gate.py` evaluate() 在状态权限矩阵前先检查 active_profile，skill/learning 直接 ALLOW。
+- **Profile-aware transition**：`transition_state.py` 支持 profile 覆盖转移表，deployment 允许 READ_CONTEXT→EXECUTE 直通。
+- **8 个新 conformance 测试用例**覆盖所有 profile。
+
+### Lane 基础设施
+
+- **spawn_lane.py**：即时 lane 创建（git worktree + 独立 CC 会话 + lane_id.json 自动身份发现）。
+- **lane-coordination.md**：lane 间文件冲突检测协议——gate hook 在 EXECUTE 中拒绝写入已被其他活跃 lane claim 的文件。
+- **Revolution 令牌**：用户批准的临时越界——PLAN_STEP 中为指定路径开写权限。
+
+### 自动续推（Auto-Continuation）
+
+- ADVANCE guard 检测到 pending WU 时自动写入 `next_action` 到 state.json。
+- READ_CONTEXT 检查 next_action：`continue_next_wu` 强制执行（block 纪律级别），`await_user` 暂停，`blocked_on_deps` 处理依赖。
+- `continuation_mode` 新增 `await_user` 选项。
+
+### 质保工具
+
+- **gap_scan.py**：L3 设计-实现差距扫描器——从设计文档提取可验证 claims，在代码中搜索实现证据，生成 gap_report.md。
+- **verify.py** 增强：更完整的自检覆盖。
+
+### 狗粮修复
+
+- EXECUTE 中 files_allowed 死锁 → scope 扩展流程写入 `execute.md` 和 `Documentation.md` §11。
+- rotate counter 2→6（减少不必要的强制旋转）。
+- execute.md 172→110 行（fork/rotate 提取到 rules/static/）。
+
+## [v2.2] — 2026-05-13
+
+### Integration Hardening
+
+- **interrupt + revolution + lane + session 四模块集成**：115 个未跟踪测试全部通过，纳入 159 全量回归。
+- **Hook 分层**：801 行单文件 → 4 模块（policy-gate 183 + boundary-guard 151 + coordination-guard 253 + main 187）。
+- **Rotate v0.2**：`--kill-old` 平台检测杀旧终端 + `--auto-recover` 自动恢复 + cross-milestone counter 重置。
+- **PLAN_STEP 死锁修复**：`--clear-rotation` 接受 PLAN_STEP。
+- **规则意图系统**：hook deny 消息附加 rule-id + intent 文档（`rules/intents/` 7 文件）。
+- 修复 R001-R005。
+
 ## [0.1.0-rc.1] — 2026-05-12
 
 ### 架构
