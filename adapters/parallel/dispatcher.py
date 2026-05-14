@@ -54,7 +54,8 @@ PROMPT_TEMPLATE = """\
 1. **Read** 你需要理解的任何文件
 2. **Implement** 达成目标所需的修改 —— 严格限定在 `files_allowed` 内
 3. **Test** 你的修改，跑验收测试
-4. **写入结果** 到 `.deepship/runs/{wu_id}/result.json`，格式如下：
+4. **Review** 调用 `Agent(code-reviewer)` 审查你的改动。risk_level=medium/high 时**必须**通过审查（review_status=passed）。risk_level=low 可跳过但必须写 review_evidence 说明豁免理由。审查不通过则修复后重新审查。
+5. **写入结果** 到 `.deepship/runs/{wu_id}/result.json`，格式如下：
 
 ```json
 {{
@@ -63,7 +64,10 @@ PROMPT_TEMPLATE = """\
   "changed_files": ["修改的文件路径列表"],
   "tests_run": ["运行的测试命令列表"],
   "summary": "一句话总结做了什么",
-  "risks": "任何风险或已知问题，没有则填 null"
+  "risks": "任何风险或已知问题，没有则填 null",
+  "review_status": "passed | failed | skipped",
+  "review_evidence": "审查结论或跳过理由",
+  "review_risk": "审查发现的风险，无则填 null"
 }}
 ```
 
@@ -219,6 +223,9 @@ def generate_wu_prompt(wu: dict, root: Path) -> str:
     tests = "\n".join(f"- {t}" for t in wu.get("acceptance_tests", [])) or "（未指定）"
 
     prompt = PROMPT_TEMPLATE
+    risk = wu.get("risk_level", "medium")
+    review_required = "必须" if risk in ("medium", "high") else "可选（low）"
+
     subs = {
         "{wu_id}": wu["id"],
         "{goal}": wu.get("goal", ""),
@@ -226,6 +233,8 @@ def generate_wu_prompt(wu: dict, root: Path) -> str:
         "{files_allowed}": files,
         "{acceptance_tests}": tests,
         "{project_context}": context,
+        "{risk_level}": risk,
+        "{review_required}": review_required,
     }
     for key, value in subs.items():
         prompt = prompt.replace(key, value)

@@ -94,3 +94,39 @@ These tests prove the adapter hook matches the policy cases, that trusted roots 
 - Worktree isolation only exists when using the parallel adapter.
 
 For true hard execution, DEEPSHIP needs a runtime such as Mate to enforce the same discipline at the tool-dispatch layer.
+
+## Native Status Line
+
+DEEPSHIP can render its current state inside Claude Code's native `statusLine`.
+This is the recommended way to keep the active milestone and Work Unit visible
+while Claude Code is showing statuses such as `Perusing...`, token usage, or
+subagent activity.
+
+Add this to the project or user Claude Code settings:
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "python C:\\Users\\27464\\.claude\\DEEPSHIP\\adapters\\cc\\statusline.py",
+    "refreshInterval": 1,
+    "padding": 0
+  }
+}
+```
+
+The renderer is read-only. It reads:
+
+- `.deepship/state.json`
+- `.deepship/work_units.json`
+- Claude Code's statusLine stdin payload, including `columns` and
+  `context_window.used_percentage` when available
+
+Example output:
+
+```text
+DEEPSHIP EXECUTE | rotate-v0.2 | WU-IR03:in_progress | 1/3 integrated | ctx 8%
+```
+
+If the current workspace is not a DEEPSHIP project, or if state files are not
+readable yet, the renderer prints an empty line instead of blocking Claude Code.

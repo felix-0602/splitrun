@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "deepship-arbitration-decision/1.0",
+  "title": "DEEPSHIP Arbitration Decision",
+  "type": "object",
+  "required": ["route", "should_create_lane"],
+  "properties": {
+    "route": {
+      "type": "string",
+      "enum": [
+        "take_ownership",
+        "duplicate",
+        "belongs_to_current_owner",
+        "new_goal_requires_lane",
+        "plan_conflict"
+      ]
+    },
+    "should_create_lane": {"type": "boolean"},
+    "owner_session_id": {"type": "string"},
+    "reason": {"type": "string"},
+    "plan_revision": {"type": "object"},
+    "a2a_contract": {"type": "object"},
+    "a2a_handoff": {"type": "object"},
+    "prompt_supplement": {"type": "object"}
+  }
+}

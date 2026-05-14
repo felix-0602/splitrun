@@ -1,0 +1,16 @@
+{
+  "version": "1.0",
+  "description": "DEEPSHIP Revolution conformance test suite.",
+  "cases": [
+    {"name": "reasonable request blocked by DEEPSHIP constraint triggers revolution", "request": "I need to skip VALIDATE for this hotfix", "block_reason": "DEEPSHIP BLOCK: illegal transition", "is_bug": false, "can_workaround": false, "expected": "TRIGGER_REVOLUTION"},
+    {"name": "normal bug does not trigger revolution", "request": "fix this test failure", "block_reason": "AssertionError: expected True, got False", "is_bug": true, "can_workaround": false, "expected": "NO_TRIGGER"},
+    {"name": "trivial request does not trigger revolution", "request": "hi", "block_reason": "DEEPSHIP BLOCK: outside project root", "is_bug": false, "can_workaround": false, "expected": "NO_TRIGGER"},
+    {"name": "non-DEEPSHIP error does not trigger revolution", "request": "fix the import", "block_reason": "ImportError: cannot import name 'foo'", "is_bug": false, "can_workaround": false, "expected": "NO_TRIGGER"},
+    {"name": "workaround possible does not trigger revolution", "request": "write a plan file", "block_reason": "DEEPSHIP BLOCK: outside current work unit", "is_bug": false, "can_workaround": true, "expected": "NO_TRIGGER"},
+    {"name": "proposal contains all required sections", "request": "skip VALIDATE for hotfix", "expected_sections": ["original_request", "reason_it_is_reasonable", "blocking_constraint", "proposed_change", "risks", "approval_needed", "rollback_plan"]},
+    {"name": "build_proposal has no side effects", "request": "skip VALIDATE", "expected_write_count": 0},
+    {"name": "approved proposal creates self-evolution lane", "request": "skip VALIDATE", "approved": true, "expected": "LANE_CREATED"},
+    {"name": "rejected proposal does not modify files", "request": "skip VALIDATE", "approved": false, "expected": "NO_MODIFICATION"},
+    {"name": "evolution lane scope is bounded", "request": "skip VALIDATE", "approved": true, "expected_scope": ["adapters/cc/transition_state.py", "protocol/state-machine.md"]}
+  ]
+}

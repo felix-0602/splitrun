@@ -1,11 +1,4 @@
-"""DEEPSHIP Parallel Dispatcher v0.1 — 固定 runner + git worktree 隔离.
-
-Usage:
-    python adapters/parallel/dispatcher.py --mode auto
-    python adapters/parallel/dispatcher.py --mode check
-    python adapters/parallel/collector.py
-    python adapters/parallel/collector.py --show-diff --cleanup
-"""
+"""DEEPSHIP Adapters — dispatcher, collector, rotate, interrupt routing, revolution channel."""
 
 from adapters.parallel.dispatcher import (
     dispatch,
@@ -27,6 +20,20 @@ from adapters.parallel.rotate import (
     rotate,
     write_continuation,
 )
+from adapters.interrupt.schemas import (
+    RouteType,
+    ReconciliationOutcome,
+    InterruptContext,
+    NormalizedIntent,
+    A2AHandoffPayload,
+    RouteDecision,
+    ReconciliationResult,
+)
+from adapters.revolution.schemas import (
+    RevolutionProposal,
+    BlockingConstraint,
+    RevolutionAuditEntry,
+)
 
 __all__ = [
     "dispatch",
@@ -43,4 +50,14 @@ __all__ = [
     "check_conflicts",
     "rotate",
     "write_continuation",
+    "RouteType",
+    "ReconciliationOutcome",
+    "InterruptContext",
+    "NormalizedIntent",
+    "A2AHandoffPayload",
+    "RouteDecision",
+    "ReconciliationResult",
+    "RevolutionProposal",
+    "BlockingConstraint",
+    "RevolutionAuditEntry",
 ]

@@ -135,3 +135,32 @@ pending → in_progress → done → integrated
 - 主线程 MUST 运行全局 VALIDATE 后才可将 WU 升级为 `integrated`
 - 子代理 `done` ≠ milestone `done`——集成权在主线程
 - 集成后 MUST 更新 `state.json` 和追加 `log.jsonl`
+## Lane Storage
+
+Long-running or interrupted goals MAY be promoted into lanes. A lane MUST be
+discoverable under `.deepship/lanes/<lane-name>/` and MUST NOT require a
+sibling `<project>-lanes/` directory.
+
+Required files:
+
+- `.deepship/lanes/<lane-name>/` is the lane worktree root.
+- `.deepship/lanes/<lane-name>/.deepship/lane.json`
+- `.deepship/lanes/<lane-name>/.deepship/state.json`
+- `.deepship/lanes/<lane-name>/.deepship/work_units.json`
+- `.deepship/lanes/<lane-name>/.deepship/handoff.md`
+- `.deepship/lanes/<lane-name>/Prompt.md`
+
+The lane directory is not a wrapper around a worktree; it is the worktree.
+Agents opened inside the lane should run the normal DEEPSHIP state machine from
+the lane-local `.deepship/`.
+
+New conversations MUST arbitrate before creating a lane. If an active owner is
+already executing the plan, the new conversation classifies the request as
+`duplicate`, `belongs_to_current_owner`, `new_goal_requires_lane`, or
+`plan_conflict`. Only `new_goal_requires_lane` may create a lane, and only after
+producing a plan revision plus an A2A contract that defines boundaries,
+interfaces, validation, and integration responsibilities.
+
+Lane completion uses `finalize`: dry-run first, then `--apply` to merge the lane
+branch, archive metadata under `.deepship/lanes-archive/`, remove the worktree,
+delete the lane branch, and remove the registry entry.

@@ -3,37 +3,143 @@
   "$id": "deepship-work-unit/1.0",
   "title": "DEEPSHIP Work Unit",
   "type": "object",
-  "required": ["id", "goal", "files_allowed", "status", "owner"],
+  "required": [
+    "id",
+    "goal",
+    "files_allowed",
+    "status",
+    "owner"
+  ],
   "properties": {
-    "id": {"type": "string", "pattern": "^WU-\\d{3}$"},
-    "goal": {"type": "string", "minLength": 1},
-    "scope": {"type": "string"},
-    "files_allowed": {"type": "array", "items": {"type": "string"}, "minItems": 1},
-    "depends_on": {"type": "array", "items": {"type": "string"}},
-    "acceptance_tests": {"type": "array", "items": {"type": "string"}},
-    "risk_level": {"type": "string", "enum": ["low", "medium", "high"]},
-    "owner": {"type": "string", "minLength": 1},
+    "id": {
+      "type": "string",
+      "pattern": "^WU-\\d{3}$"
+    },
+    "goal": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scope": {
+      "type": "string"
+    },
+    "files_allowed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "depends_on": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "acceptance_tests": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "risk_level": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "owner": {
+      "type": "string",
+      "minLength": 1
+    },
     "parallel_group": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "default": null,
       "description": "Fork 组名。同组 WU 由 dispatcher 同时创建 worktree 并发执行。null = 不参与 fork。"
     },
     "execution_mode": {
       "type": "string",
-      "enum": ["inline", "serial", "fork"],
+      "enum": [
+        "inline",
+        "serial",
+        "fork"
+      ],
       "default": "inline",
       "description": "inline: 主线程直接执行。serial: 单会话串行（可配合 continuation_mode=rotatable 跨会话）。fork: 同 parallel_group 的 WU 由 dispatcher 并行分派到独立 worktree。"
     },
     "continuation_mode": {
       "type": "string",
-      "enum": ["normal", "rotatable"],
+      "enum": [
+        "normal",
+        "rotatable"
+      ],
       "default": "normal",
       "description": "rotatable: 允许在安全点保存 checkpoint 后跨会话旋转继续。normal: 不旋转，单会话完成。"
     },
-    "status": {"type": "string", "enum": ["pending","in_progress","done","integrated","blocked","failed"]},
-    "validation_evidence": {"type": ["string", "null"]},
-    "integration_status": {"type": ["string", "null"]},
-    "created_at": {"type": "string", "format": "date-time"},
-    "updated_at": {"type": "string", "format": "date-time"}
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "in_progress",
+        "done",
+        "integrated",
+        "blocked",
+        "failed"
+      ]
+    },
+    "review_status": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        null,
+        "passed",
+        "failed",
+        "skipped"
+      ],
+      "default": null,
+      "description": "code review 状态。passed=审查通过，failed=审查未通过，skipped=已豁免(仅 risk_level=low)，null=未审查"
+    },
+    "review_evidence": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null,
+      "description": "review 证据。passed 时写审查结论，skipped 时写豁免理由"
+    },
+    "review_risk": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null,
+      "description": "review 发现的风险。null=无风险或未审查"
+    },
+    "validation_evidence": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "integration_status": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
   }
 }

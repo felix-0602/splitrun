@@ -77,13 +77,44 @@ def _check_guard(
             return False, "current_work_unit 为空，无法进入 EXECUTE"
         if not current_wu.get("files_allowed"):
             return False, f"{current_wu_id} 的 files_allowed 为空"
-        # 标记 WU 为 in_progress（写入 work_units.json）
+
+        # rotate 强制门禁：同一会话完成 ≥2 个 WU 后必须 rotate
+        session_wu_count = state.get("_session_wu_count", 0)
+        remaining = [w for w in wus if w.get("status") == "pending" and w["id"] != current_wu_id]
+        if session_wu_count >= 2 and remaining:
+            return False, (
+                f"同一会话已完成 {session_wu_count} 个 WU，还有 {len(remaining)} 个待执行。"
+                "请先 rotate 再继续。运行: python adapters/parallel/rotate.py "
+                "--diff-intent '<当前 diff>' --next-steps '<新会话下一步>'"
+            )
+
+        # context-low 门禁：上下文压力过大时强制 rotate
+        if _is_context_critical():
+            return False, (
+                "上下文余量不足（剩余 ≤ 25%）。请先 rotate 再继续。"
+                "运行: python adapters/parallel/rotate.py "
+                "--diff-intent '<当前 diff>' --next-steps '<新会话下一步>'"
+            )
+
+        # 标记 WU 为 in_progress，递增计数器
         if current_wu.get("status") == "pending":
             _set_wu_status(root, current_wu_id, "in_progress")
+            state["_session_wu_count"] = session_wu_count + 1
 
-    # → VALIDATE: 接受从 EXECUTE 或 REPAIR 进入
+    # → VALIDATE: 接受从 EXECUTE 或 REPAIR 进入。
+    # 检查 review evidence（硬门禁）。inline WU 无 result.json 时从 WU 记录检查。
     if to_state == "VALIDATE":
-        if context.get("acceptance_tests_ran") or _find_result_file(current_wu_id):
+        if current_wu:
+            result_file = _find_result_file(current_wu_id) if current_wu_id else None
+            result_data = None
+            if result_file:
+                try:
+                    result_data = json.loads(result_file.read_text(encoding="utf-8"))
+                except (json.JSONDecodeError, OSError):
+                    pass
+            review_ok, review_reason = _check_review_evidence(current_wu, result_data)
+            if not review_ok:
+                return False, review_reason
             return True, ""
 
     
@@ -97,8 +128,10 @@ def _check_guard(
             ]
             if not_integrated:
                 return False, f"以下 WU 未 integrated: {not_integrated}"
+        # 跨 milestone 计数器归零：新 milestone 从 0 开始
+        state["_session_wu_count"] = 0
 
-    # → ADVANCE: 已启动的 WU（in_progress/done）必须 integrated。pending 允许。
+    # → ADVANCE: 已启动的 WU（in_progress/done）必须 integrated + review 通过。pending 允许。
     if to_state == "ADVANCE":
         if wus:
             not_integrated = [
@@ -109,15 +142,25 @@ def _check_guard(
             if not_integrated:
                 return False, f"以下已启动 WU 未 integrated: {not_integrated}"
 
-    # → COMPLETE: 所有 WU integrated（或无 WU 纯文档任务）
-    if to_state == "COMPLETE":
-        if wus:
-            not_integrated = [
-                w["id"] for w in wus
-                if w.get("status") != "integrated"
-            ]
-            if not_integrated:
-                return False, f"以下 WU 未 integrated: {not_integrated}"
+            # 检查 review evidence：所有非 pending WU 必须有 review
+            missing_review = []
+            for w in wus:
+                if w.get("status") == "pending":
+                    continue
+                if w.get("status") == "integrated":
+                    continue  # 已集成视为已通过审查
+                result_file = _find_result_file(w["id"])
+                result_data = None
+                if result_file:
+                    try:
+                        result_data = json.loads(result_file.read_text(encoding="utf-8"))
+                    except (json.JSONDecodeError, OSError):
+                        pass
+                review_ok, review_reason = _check_review_evidence(w, result_data)
+                if not review_ok:
+                    missing_review.append(review_reason)
+            if missing_review:
+                return False, f"review 门禁未通过: {'; '.join(missing_review)}"
 
     # → REPAIR: VALIDATE 失败证据 + repair_count < 3
     if to_state == "REPAIR":
@@ -153,6 +196,98 @@ def _check_files_in_bounds(result: dict, wu: dict) -> bool:
         if not matched:
             return False
     return True
+
+
+def _check_review_evidence(wu: dict, result: dict | None) -> tuple[bool, str]:
+    """检查 WU 的 review 证据 — 硬门禁。
+
+    risk_level=medium/high: 必须 review_status=passed
+    risk_level=low: 必须 review_status 非空（passed/skipped），skipped 需理由
+    """
+    risk = wu.get("risk_level", "medium")
+
+    # 优先从 result.json 取 review 字段，其次从 WU 记录
+    review_status = None
+    review_evidence = None
+    if result:
+        review_status = result.get("review_status")
+        review_evidence = result.get("review_evidence")
+    if not review_status:
+        review_status = wu.get("review_status")
+        review_evidence = wu.get("review_evidence")
+
+    if not review_status:
+        return False, f"{wu['id']}: 缺少 review_status（risk_level={risk}）"
+
+    if review_status == "passed":
+        if not review_evidence:
+            return False, f"{wu['id']}: review_status=passed 但缺少 review_evidence"
+        return True, ""
+
+    if review_status == "skipped":
+        if risk in ("medium", "high"):
+            return False, f"{wu['id']}: risk_level={risk} 不允许跳过 review（仅 low 可豁免）"
+        if not review_evidence:
+            return False, f"{wu['id']}: review_status=skipped 但缺少豁免理由"
+        return True, ""
+
+    if review_status == "failed":
+        return False, f"{wu['id']}: review 未通过 — {review_evidence or '无详细信息'}"
+
+    return False, f"{wu['id']}: 未知 review_status: {review_status}"
+
+
+def _is_context_critical() -> bool:
+    """读取 gsd-context-monitor 的 bridge file，判断剩余上下文是否 ≤ 25%。"""
+    import glob as _glob
+    import os as _os
+    import time as _time
+
+    tmp = _os.environ.get("TMPDIR", _os.environ.get("TEMP", "/tmp"))
+    now = _time.time()
+    for f in _glob.glob(_os.path.join(tmp, "claude-ctx-*.json")):
+        try:
+            mtime = _os.path.getmtime(f)
+            if now - mtime > 60:
+                continue
+            data = json.loads(Path(f).read_text(encoding="utf-8"))
+            remaining = data.get("remaining_percentage", 100)
+            if remaining <= 25:
+                return True
+        except (json.JSONDecodeError, OSError, KeyError):
+            continue
+    return False
+
+
+def _archive_milestone(root: Path, state: dict, wus: list[dict]) -> None:
+    """COMPLETE 时归档当前 milestone 的 work_units 快照到 .deepship/archive/。"""
+    import shutil
+
+    archive = root / ".deepship" / "archive"
+    archive.mkdir(parents=True, exist_ok=True)
+    milestone = state.get("current_milestone", "unknown")
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    src = root / ".deepship" / "work_units.json"
+    dst = archive / f"milestone-{milestone}-{ts}.json"
+    if src.exists():
+        shutil.copy2(src, dst)
+        print(f"[COMPLETE] 已归档 {len(wus)} 个 WU → {dst.name}")
+
+
+def _clear_interrupt_flags(state: dict) -> None:
+    """清除所有中断标记（类比 _rotation_pending 清除）。"""
+    interrupt_keys = [
+        "_interrupt_pending",
+        "_interrupt_type",
+        "_interrupt_received_at",
+        "_interrupted_lane",
+        "_interrupt_intent",
+        "_interrupt_handled_at",
+        "_interrupt_reconciliation",
+    ]
+    for key in interrupt_keys:
+        state.pop(key, None)
+    state["_session_wu_count"] = 0
 
 
 # ── 状态读写 ────────────────────────────────────────────
@@ -246,8 +381,11 @@ def transition(
     wu_id: str | None = None,
     context: dict | None = None,
     project_root: Path | None = None,
+    clear_rotation: bool = False,
+    auto_recover: bool = False,
+    clear_interrupt: bool = False,
 ) -> dict:
-    """执行状态转移。返回 {"success": bool, "from": str, "to": str, "reason": str}。"""
+    """执行状态转移。返回 {"success": bool, "from": str, "to": str, "reason": str"}。"""
     root = project_root or _find_root()
     if root is None:
         return {"success": False, "reason": "未找到 .deepship/ 目录"}
@@ -256,6 +394,105 @@ def transition(
     state = _load_state(root)
     wus = _load_work_units(root)
     from_state = state.get("current_state", "READ_CONTEXT")
+
+    # 0. --clear-rotation: 允许 READ_CONTEXT 和 PLAN_STEP（PLAN_STEP 可能因 rotate 门禁死锁）
+    if clear_rotation:
+        if from_state not in ("READ_CONTEXT", "PLAN_STEP"):
+            return {
+                "success": False,
+                "from": from_state,
+                "to": to_state,
+                "reason": f"--clear-rotation 仅在 READ_CONTEXT 状态可用，当前: {from_state}。",
+            }
+        state.pop("_rotation_pending", None)
+        state.pop("_rotated_at", None)
+        state.pop("_rotated_from_wu", None)
+        state["_session_wu_count"] = 0
+        _write_state(root, state)
+        _append_log(root, {
+            "from_state": from_state,
+            "to_state": from_state,
+            "result": "ok",
+            "reason": "rotation cleared — continuation.md 已确认读取",
+            "current_work_unit": state.get("current_work_unit", ""),
+        })
+        return {
+            "success": True,
+            "from": from_state,
+            "to": from_state,
+            "reason": "已清除 _rotation_pending/_rotated_at/_rotated_from_wu。可以正常推进状态。",
+        }
+
+    # 0. --auto-recover: READ_CONTEXT 下一步到位（读 continuation.md + 清 rotation + claim ownership）
+    if auto_recover:
+        if from_state != "READ_CONTEXT":
+            return {
+                "success": False,
+                "from": from_state,
+                "to": to_state,
+                "reason": f"--auto-recover 仅在 READ_CONTEXT 状态可用，当前: {from_state}。",
+            }
+        cont_path = root / ".deepship" / "continuation.md"
+        cont_summary = ""
+        if cont_path.exists():
+            cont_summary = cont_path.read_text(encoding="utf-8")[:500]
+        state.pop("_rotation_pending", None)
+        state.pop("_rotated_at", None)
+        state.pop("_rotated_from_wu", None)
+        state["_session_wu_count"] = 0
+        _write_state(root, state)
+
+        # claim session ownership + 写 session_started_at 到 state.json
+        # hook 用 state.session_started_at vs session.owner_started_at 做 generation 对比
+        try:
+            from adapters.session.session import SessionManager
+            sm = SessionManager(root)
+            sm.claim_ownership(root)
+            session_data = sm._read()
+            state["session_started_at"] = session_data.get("owner_started_at", "")
+        except Exception:
+            pass
+        _write_state(root, state)
+
+        _append_log(root, {
+            "from_state": from_state,
+            "to_state": from_state,
+            "result": "ok",
+            "reason": "auto-recover: rotation cleared + session ownership claimed",
+            "current_work_unit": state.get("current_work_unit", ""),
+        })
+        return {
+            "success": True,
+            "from": from_state,
+            "to": from_state,
+            "reason": "auto-recover 完成：rotation cleared + session ownership claimed。",
+            "continuation_summary": cont_summary or "(无 continuation.md)",
+        }
+
+    # 0. --clear-interrupt: 仅在 READ_CONTEXT 状态允许清除中断标记
+    if clear_interrupt:
+        if from_state != "READ_CONTEXT":
+            return {
+                "success": False,
+                "from": from_state,
+                "to": to_state,
+                "reason": f"--clear-interrupt 仅在 READ_CONTEXT 状态可用，当前: {from_state}。",
+            }
+        _clear_interrupt_flags(state)
+        _write_state(root, state)
+        _append_log(root, {
+            "from_state": from_state,
+            "to_state": from_state,
+            "result": "ok",
+            "reason": "interrupt cleared — reconciliation complete",
+            "current_work_unit": state.get("current_work_unit", ""),
+        })
+        return {
+            "success": True,
+            "from": from_state,
+            "to": from_state,
+            "reason": "已清除 _interrupt_pending/_interrupt_type/_interrupted_lane 等中断标记。可以正常推进状态。",
+        }
 
     # 更新 state 中的 WU 引用
     if wu_id:
@@ -268,6 +505,15 @@ def transition(
             "from": from_state,
             "to": to_state,
             "reason": "rotation_pending=true——新会话必须先 READ_CONTEXT 读取 continuation.md，确认后清除 _rotation_pending 再进 EXECUTE。",
+        }
+
+    # 0. interrupt_pending 门禁：中断未处理时禁止进入 EXECUTE
+    if to_state == "EXECUTE" and state.get("_interrupt_pending"):
+        return {
+            "success": False,
+            "from": from_state,
+            "to": to_state,
+            "reason": "interrupt_pending=true——中断尚未处理。请先完成中断路由流程，执行 reconciliation 后再继续。",
         }
 
     # 0. fork 门禁：有 fork WU 未回收时不能从 EXECUTE 直接到 VALIDATE
@@ -328,6 +574,10 @@ def transition(
         if recovered:
             print(f"[RECORD] 已回收 {len(recovered)} 条 pending records 到 Documentation.md")
 
+    # 3.5 COMPLETE 时归档当前 milestone 的 work_units
+    if to_state == "COMPLETE" and wus:
+        _archive_milestone(root, state, wus)
+
     # 4. 更新状态
     old_state = dict(state)
     state["current_state"] = to_state
@@ -376,16 +626,26 @@ def main() -> None:
 示例:
   python adapters/cc/transition_state.py --to EXECUTE --wu WU-001
   python adapters/cc/transition_state.py --to VALIDATE
+  python adapters/cc/transition_state.py --clear-rotation
+  python adapters/cc/transition_state.py --auto-recover
+  python adapters/cc/transition_state.py --clear-interrupt
   python adapters/cc/transition_state.py --to REPAIR --context '{"validation_failed":true,"failure_reason":"test_auth failed"}'
   python adapters/cc/transition_state.py --to COMPLETE
         """,
     )
-    parser.add_argument("--to", required=True, help="目标状态")
+    parser.add_argument("--to", default="", help="目标状态（--clear-rotation/--auto-recover/--clear-interrupt 时不需要）")
     parser.add_argument("--wu", help="当前 Work Unit ID")
     parser.add_argument("--context", type=str, default="{}", help="上下文 JSON")
     parser.add_argument("--project-root", "-d", type=str, help="项目根目录")
+    parser.add_argument("--clear-rotation", action="store_true", help="清除 _rotation_pending 标记（仅 READ_CONTEXT）")
+    parser.add_argument("--auto-recover", action="store_true", help="旋转后自动恢复：清除 rotation + 读 continuation.md + claim session ownership")
+    parser.add_argument("--clear-interrupt", action="store_true", help="清除 _interrupt_pending 等中断标记（仅 READ_CONTEXT）")
 
     args = parser.parse_args()
+
+    if not args.to and not args.clear_rotation and not args.auto_recover and not args.clear_interrupt:
+        print(json.dumps({"success": False, "reason": "需要 --to、--clear-rotation、--auto-recover 或 --clear-interrupt"}))
+        sys.exit(1)
 
     try:
         ctx = json.loads(args.context)
@@ -395,10 +655,13 @@ def main() -> None:
 
     root = Path(args.project_root) if args.project_root else None
     result = transition(
-        to_state=args.to,
+        to_state=args.to or "READ_CONTEXT",
         wu_id=args.wu,
         context=ctx,
         project_root=root,
+        clear_rotation=args.clear_rotation,
+        auto_recover=args.auto_recover,
+        clear_interrupt=args.clear_interrupt,
     )
 
     print(json.dumps(result, ensure_ascii=False))

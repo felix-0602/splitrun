@@ -84,3 +84,19 @@
 4. 写入 `log.jsonl`（种子行：`{"init":true,"timestamp":"..."}`）
 
 Runtime 在 READ_CONTEXT 时检测 `.deepship/` 是否存在——不存在则自动初始化。
+## Dynamic Planning Artifacts
+
+These files are PLAN_STEP outputs used for new-session arbitration and prompt
+alignment:
+
+| File | Schema | Read | Write |
+|------|--------|------|-------|
+| `.deepship/sessions.json` | `schemas/session_registry.schema.json` | READ_CONTEXT, PLAN_STEP | PLAN_STEP |
+| `.deepship/plan-revisions/*.md` | Markdown | PLAN_STEP | PLAN_STEP |
+| `.deepship/a2a/*.json` | `schemas/a2a_contract.schema.json` or arbitration payload | PLAN_STEP | PLAN_STEP |
+| `.deepship/prompt-supplements/*.md` | Markdown | READ_CONTEXT, PLAN_STEP | PLAN_STEP |
+
+When a new conversation enters a project with an active owner session, it MUST
+produce these artifacts before creating an additional lane/worktree. The
+artifacts align the plan revision, A2A interface, validation contract, and
+prompt supplement so later integration does not depend on stale assumptions.

@@ -8,30 +8,33 @@
 | 类别 | 工具 | 含义 |
 |------|------|------|
 | `read` | read_file, grep, glob, git status/diff/log | 只读，不修改任何文件 |
+| `read_exec` | bash 只读命令（git status/log/diff, ls, cat, npm/pip list, node -v 等） | 只读观察，无文件/环境副作用 |
 | `state_write` | write(.deepship/*), append(.deepship/log.jsonl) | 写持久化状态文件 |
 | `doc_write` | write(Plan.md), write(Documentation.md), write(*.md) | 写项目文档 |
 | `code_write` | write_file, edit_file | 修改或创建项目代码文件 |
-| `exec` | bash（含 pytest, npm, lint 等） | 执行命令 |
+| `exec` | bash 变更命令（pytest, npm install, lint, build, rm 等） | 执行可能有文件/环境副作用的命令 |
+| `skill_user` | Skill 工具（用户显式调用 /skill） | 用户主动键入的 slash command |
+| `skill_auto` | Skill 工具（模型自动搜索/匹配） | 模型自发搜索匹配合适技能 |
 | `transition` | transition_state | 请求状态转移 |
 
 ## 状态 → 工具权限矩阵
 
 **MUST NOT** = Runtime 必须在 `ToolRegistry.execute()` 层面拒绝。
 
-| 状态 | read | state_write | doc_write | code_write | exec | transition |
-|------|------|-------------|-----------|------------|------|------------|
-| `READ_CONTEXT` | ALLOW | ALLOW | MUST NOT | MUST NOT | MUST NOT（除 git status） | ALLOW |
-| `CLARIFY_INTENT` | ALLOW | ALLOW | ALLOW | MUST NOT | MUST NOT | ALLOW |
-| `MAP_REALITY` | ALLOW | MUST NOT | MUST NOT | MUST NOT | MUST NOT（除安全探测） | ALLOW |
-| `SELECT_MILESTONE` | ALLOW | ALLOW（仅 WU 结构） | MUST NOT | MUST NOT | MUST NOT | ALLOW |
-| `PLAN_STEP` | ALLOW | ALLOW | ALLOW | MUST NOT | MUST NOT | ALLOW |
-| `EXECUTE` | ALLOW | ALLOW | ALLOW（仅集成文档） | ALLOW（仅 files_allowed） | ALLOW（测试+build） | ALLOW |
-| `VALIDATE` | ALLOW | MUST NOT | MUST NOT | MUST NOT | ALLOW（测试+lint+build） | ALLOW |
-| `REPAIR` | ALLOW | MUST NOT | MUST NOT | ALLOW | ALLOW（测试） | ALLOW |
-| `RECORD` | ALLOW | ALLOW | ALLOW（仅 Documentation.md） | MUST NOT | MUST NOT | ALLOW |
-| `ADVANCE` | ALLOW | ALLOW | ALLOW（仅交付总结） | MUST NOT | MUST NOT | ALLOW |
-| `BLOCK` | ALLOW | ALLOW（仅记录阻塞） | ALLOW（仅 §5/§9） | MUST NOT | MUST NOT | MUST NOT |
-| `COMPLETE` | ALLOW | ALLOW（仅 state.json） | ALLOW（仅 Documentation.md） | MUST NOT | MUST NOT | MUST NOT |
+| 状态 | read | read_exec | skill_user | skill_auto | state_write | doc_write | code_write | exec | transition |
+|------|------|-----------|------------|------------|-------------|-----------|------------|------|------------|
+| `READ_CONTEXT` | ALLOW | ALLOW | ALLOW | MUST NOT | ALLOW | MUST NOT | MUST NOT | MUST NOT | ALLOW |
+| `CLARIFY_INTENT` | ALLOW | ALLOW | ALLOW | ALLOW | ALLOW | ALLOW | MUST NOT | MUST NOT | ALLOW |
+| `MAP_REALITY` | ALLOW | ALLOW | ALLOW | MUST NOT | MUST NOT | MUST NOT | MUST NOT | MUST NOT | ALLOW |
+| `SELECT_MILESTONE` | ALLOW | ALLOW | ALLOW | MUST NOT | ALLOW（仅 WU 结构） | MUST NOT | MUST NOT | MUST NOT | ALLOW |
+| `PLAN_STEP` | ALLOW | ALLOW | ALLOW | ALLOW | ALLOW | ALLOW | MUST NOT | MUST NOT | ALLOW |
+| `EXECUTE` | ALLOW | ALLOW | ALLOW | ALLOW | ALLOW | ALLOW（仅集成文档） | ALLOW（仅 files_allowed） | ALLOW（测试+build） | ALLOW |
+| `VALIDATE` | ALLOW | ALLOW | ALLOW | MUST NOT | MUST NOT | MUST NOT | MUST NOT | ALLOW（测试+lint+build） | ALLOW |
+| `REPAIR` | ALLOW | ALLOW | ALLOW | MUST NOT | MUST NOT | MUST NOT | ALLOW | ALLOW（测试） | ALLOW |
+| `RECORD` | ALLOW | ALLOW | ALLOW | MUST NOT | ALLOW | ALLOW（仅 Documentation.md） | MUST NOT | MUST NOT | ALLOW |
+| `ADVANCE` | ALLOW | ALLOW | ALLOW | MUST NOT | ALLOW | ALLOW（仅交付总结） | MUST NOT | MUST NOT | ALLOW |
+| `BLOCK` | ALLOW | ALLOW | ALLOW | MUST NOT | ALLOW（仅记录阻塞） | ALLOW（仅 §5/§9） | MUST NOT | MUST NOT | MUST NOT |
+| `COMPLETE` | ALLOW | ALLOW | ALLOW | MUST NOT | ALLOW（仅 state.json） | ALLOW（仅 Documentation.md） | MUST NOT | MUST NOT | MUST NOT |
 
 ## EXECUTE 补充规则
 
@@ -44,7 +47,7 @@
 
 ## 状态边界补充规则
 
-- `READ_CONTEXT` MAY 读取 `.deepship/*`、Prompt、Plan、Documentation；MUST NOT 写项目代码
+- `READ_CONTEXT` MAY 读取 `.deepship/*`、Prompt、Plan、Documentation，执行 `read_exec`（只读 bash：ls, git status, npm list 等），响应用户显式 `skill_user` 调用；MUST NOT 写项目代码、执行 `exec`（副作用 bash）、或 `skill_auto`（自动搜索匹配技能）
 - `ADVANCE` MAY 读取状态、更新状态转移记录、决定 READ_CONTEXT / SELECT_MILESTONE / COMPLETE；MUST NOT 写项目代码
 - 配置了 `workspace` 时，任何写入目标都 MUST 位于 workspace 内，即使该路径被列入 `files_allowed`
 
@@ -60,3 +63,15 @@
 本文档使用 RFC 2119 术语：
 - **MUST** / **MUST NOT** = 协议要求，runtime 必须强制执行
 - 区别于 `rules/states/*.md` 中的 SHOULD / checklist（给模型阅读的建议）
+## Dynamic Planning Artifact Policy
+
+The following paths are PLAN_STEP-only planning artifacts:
+
+- `.deepship/sessions.json`
+- `.deepship/plan-revisions/*.md`
+- `.deepship/a2a/*.json`
+- `.deepship/prompt-supplements/*.md`
+
+They MAY be written in PLAN_STEP. They MUST NOT be written in EXECUTE, VALIDATE,
+REPAIR, or ordinary lane execution. This prevents a session from silently
+changing coordination contracts while code is being edited.

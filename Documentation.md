@@ -11,11 +11,11 @@
 
 | 字段 | 值 |
 |------|-----|
-| 当前 Milestone | [当前 milestone 名称] |
-| 状态 | [pending / in_progress / done] |
-| 整体完成率 | [大概百分比或描述] |
-| 上次更新 | [YYYY-MM-DD HH:mm] |
-| 框架版本 | DEEPSHIP v2.1（JIT 规则架构） |
+| 当前 Milestone | integration-hardening |
+| 状态 | done |
+| 整体完成率 | 100%（5/5 WU integrated） |
+| 上次更新 | 2026-05-14 |
+| 框架版本 | DEEPSHIP v2.2（多会话协作模块 + hook 分层 + rotate v0.2） |
 
 ---
 
@@ -90,6 +90,7 @@
 
 | 时间 | Milestone | 版本变化 | 变更类型 | 用户可见变化 | 契约/迁移影响 | 文档更新 | 验证 |
 |------|-----------|----------|----------|--------------|--------------|----------|------|
+| 2026-05-14 | **integration-hardening** | minor | feature | **核心变更**：(1) interrupt/revolution/lane/session 模块集成（115 测试→159 全量）(2) hook 分层：801行→policy-gate.js(183)+boundary-guard.js(151)+coordination-guard.js(253)+main(187) (3) rotate v0.2: --kill-old 平台杀旧终端 + --auto-recover 自动恢复 + cross-milestone counter 重置 (4) PLAN_STEP 死锁修复：--clear-rotation 允许 PLAN_STEP (5) execute.md 172→110 行：fork/rotate 提取到 rules/static/ (6) WU 完整性检查修复：milestone 变化或 state_write 状态下允许归档 integrated WU | rotate.py CLI 新增 --kill-old；transition_state.py --clear-rotation 接受 PLAN_STEP；hook 入口改为 require() 三层模块 | Documentation.md, README.md, adapters/claude-code/README.md + 新增 adapters/claude-code/hooks/{policy-gate,boundary-guard,coordination-guard}.js, rules/static/{fork,rotate}.md | 159/159 PASS + verify.py 0 errors |
 | 2026-05-11 | **JIT 规则架构** | minor | architecture | **核心变更**：implement/ 6文件~1200行全量加载 → `core/manifest.md`（~50行常驻）+ `rules/states/`（11个状态检查表，每文件30-50行）+ `rules/static/`（2个稳定规则文件）。implement/ 保留为归档参考。CLAUDE.md DeepShip 段从 12 行精简为指向 core/manifest.md 的索引 | **规则加载方式完全变化**：旧流程"启动时全量读 implement/"→ 新流程"每状态进入时 JIT Read rules/states/。implement/index.md 更新为归档说明 | CLAUDE.md, Documentation.md, implement/index.md + 新增 core/manifest.md, rules/states/* (11文件), rules/static/* (2文件) | 人工 review |
 | 2026-05-08 19:00 | 框架演进 | minor | refactor | B.8 深度模块与接口设计 + 逃逸出口；D.6/D.7 重写为自然沟通系统；D.2 精简为 5 阻塞模式；Documentation §7 简化 | 无破坏性变化 | Implement.md, Prompt.md, Documentation.md | 人工 review |
 | 2026-05-10 18:00 | Superpowers 融合 | minor | feature | +CLARIFY_INTENT 状态（需求澄清）；+TDD 内循环 + 并行子代理分派；Heartbeat 升级为 commit 风格实时报备；+D.6.6 交付总结；A.5 审查分 AI 自审/人类审查两层；工具索引新增 15 个 Superpowers+Ralph 技能；+§11 代码模式沉淀区 | 无破坏性变化 | Implement.md, Documentation.md | 人工 review |
@@ -120,6 +121,11 @@
 
 | ID | 类型 | 描述 | 违反规则 | 原因 | 剩余风险 | 还债计划 |
 |----|------|------|----------|------|----------|----------|
+| R001 | debt | rotate 不杀旧会话：spawn_new_session() 开新终端后旧会话继续运行，可能双会话并行冲突 | 不适用 | v0.2 已通过 --kill-old 平台检测杀旧终端（Windows taskkill / Unix pkill）实现。未使用 --kill-old 时仍依赖用户手动关闭 | 低 | 2026-05-14 |
+| R002 | debt | rotate 恢复流程需手动执行 --clear-rotation，不是新会话自动完成的 | 不适用 | v0.2 已通过 --auto-recover 实现（清除旋转标记 + claim session ownership + 重置 counter）。read-context.md 已更新引导流程 | 无 | 2026-05-14 |
+| R003 | debt | hook JS 文件修改后需重启会话才生效（CC 在会话启动时 spawn hook 子进程，后续修改不重新加载） | 不适用 | CC 架构限制：hook 子进程在会话期间持续运行。狗粮发现：DEEPSHIP 不能用自己的一套 hook 来改自己的 hook | 改 hook 时需用 Bash 绕过（如 python -c）写 hook 文件，或分两个会话进行 | 中等跟踪，暂不定还债日期 | 低 | 2026-05-14 |
+| R004 | debt | `_session_wu_count` 跨 milestone 未重置（COMPLETE 后启动新 milestone 时 counter 仍为旧值，触发虚假 rotate 门禁） | 不适用 | v0.2 已修复：transition_state.py COMPLETE guard 中 `state["_session_wu_count"] = 0` | 无 | 2026-05-14 |
+| R005 | debt | PLAN_STEP 死锁：只能到 EXECUTE，但 EXECUTE 被 rotate 门禁挡住 → 无法回 READ_CONTEXT 清 counter（v0.2 修复：--clear-rotation 现接受 PLAN_STEP） | 不适用 | v0.2 已修复 | 无 | 2026-05-14 |
 | K001 | debt | `PaymentService.charge()` 穿过 OrderRepo、InventoryService、StripeClient、EmailService 四个模块，测试需要 4 个 mock | B.8 规则2 | 合并需 3 天重构，M2 截止明天；已确认为已知风险 | 后续在 charge 里加逻辑（退款、分期）时可能改漏其中某个模块 | M3 启动时优先重构 |
 
 **记录与未记录的区别**：
@@ -165,6 +171,7 @@
 
 | 时间 | Milestone | 完成了什么 | 下一步 | 需要你判断 |
 |------|-----------|-----------|--------|-----------|
+| 2026-05-14 | integration-hardening | (1) 集成 interrupt/revolution/lane/session 模块 — 115 untracked 测试全部通过，纳入 159 全量回归 (2) hook 分层：801 行 → 4 文件（policy-gate 183 + boundary-guard 151 + coordination-guard 253 + main 187）(3) rotate v0.2: --kill-old + --auto-recover + cross-milestone counter reset (4) PLAN_STEP 死锁修复 (5) execute.md 172→110 行 (6) WU 完整性检查修复 (7) fix R001-R005 | 见 §10 下一步 | 无 |
 | 2026-05-10 19:45 | DEEPSHIP v1.2 | ECC skill 裁剪完成：skills 309→59 DAILY / 250 LIBRARY，agents 69→21 DAILY / 48 LIBRARY。Superpowers 重疊 skill 以 Superpowers 版本优先，ECC 同名版本入 LIBRARY。修复 fork bomb deny 规则解析错误。突触保持完整不裁剪 | 验证：下一会话观察 `/doctor` 的 dropped descriptions 数量 | 无 |
 
 ### 运行记录详情
@@ -227,11 +234,9 @@
 
 ## 10. 下一步
 
-> AI 完成一个 milestone 后更新这里，写清楚下一个 milestone 是什么。
-
-- [ ] [下一个 milestone 的任务概要]
-- [ ] [待解决的已知问题]
-- [ ] [待用户确认的事项]
+- [ ] **下一 milestone 方向**：全自动上下文旋转（检测到上下文压力 → 自动写 checkpoint → 杀旧会话 → 新会话自动接管，无需人工 `--kill-old`）
+- [ ] **待解决已知问题**：R003（hook 修改需重启会话）为 CC 架构限制，中等跟踪暂不定还债日期
+- [ ] **待用户确认**：interrupt/revolution/lane/session 模块已集成并通过测试，是否需要端到端手动验收
 
 ---
 

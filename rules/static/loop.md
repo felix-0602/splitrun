@@ -32,6 +32,7 @@
 | **停等条件** | 仅在 BLOCK / Help Gradient "判断" / "需要你" 时停止 |
 | **Heartbeat 不停** | Heartbeat 汇报后继续推进，除非 heartbeat 中明确声明了停等条件 |
 | **上下文耗尽** | 接近窗口上限时主动 RECORD 当前进度再继续，而非静默停止 |
+| **强制 rotate** | `_session_wu_count ≥ 2` 或上下文 ≤ 25% 时，`transition_state.py` 硬拒绝 `→ EXECUTE`，必须先 rotate |
 | **禁止空转** | 无新目标时不得为了"遵守自治循环"而重复读文档、找任务 |
 
 ## 终止态（COMPLETE）

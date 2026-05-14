@@ -161,6 +161,51 @@ DEEPSHIP 处于实验性工程纪律阶段（v0.1.0-rc.1）：
 - 🚧 全自动上下文旋转（杀旧进程）仍需设计
 - 🚧 Mate runtime 的硬门禁仍是长期方向
 
+## Lane Storage
+
+Lane state is managed inside `.deepship`, not in sibling project folders.
+
+```text
+.deepship/
+  lanes.json
+  lanes/
+    <lane-name>/              # this directory is the lane worktree root
+      .deepship/
+        lane.json
+        state.json
+        work_units.json
+        handoff.md
+      Prompt.md
+```
+
+`adapters/lane/lane.py create <name>` creates a git worktree at
+`.deepship/lanes/<name>/`. The lane's own DEEPSHIP runtime state lives inside
+that worktree at `.deepship/lanes/<name>/.deepship/`, so a conversation opened
+inside the lane can continue the normal DEEPSHIP state machine. The old
+`<project>-lanes/` sibling layout is treated as legacy only.
+
+New conversations do not automatically create lanes. They first run dynamic
+session arbitration:
+
+- `duplicate`: stop; the active owner is already doing it.
+- `belongs_to_current_owner`: send an A2A handoff to the active owner and ask it
+  to pause, reconcile the plan, and continue.
+- `new_goal_requires_lane`: create a plan revision plus an A2A contract before
+  creating a lane/worktree.
+- `plan_conflict`: ask the active owner to stop and replan from the revised
+  plan.
+
+Lane teardown is explicit:
+
+```bash
+python adapters/lane/lane.py finalize <name>          # dry-run
+python adapters/lane/lane.py finalize <name> --apply  # merge, archive metadata, remove worktree
+```
+
+`finalize --apply` archives lane metadata under `.deepship/lanes-archive/`,
+removes the lane worktree and branch, and removes the registry entry after a
+successful merge.
+
 ## License
 
 MIT

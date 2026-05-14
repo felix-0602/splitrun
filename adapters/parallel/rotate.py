@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
 """
-DEEPSHIP Session Rotator v0.1 — 自旋转：保存 checkpoint → 开新终端继续.
+DEEPSHIP Session Rotator v0.2 — 自旋转：保存 checkpoint → 开新终端继续.
 
-由模型在执行中的安全点调用。不杀当前进程，只开新终端。
-新会话通过 READ_CONTEXT 读取 continuation.md 自然接上。
+由模型在执行中的安全点调用。
+新会话通过 READ_CONTEXT 读取 continuation.md + --auto-recover 接上。
+
+v0.2:
+  - --kill-old: 平台检测并尝试杀旧终端（Windows: taskkill, Unix: pkill）
+  - continuation.md 模板更新为新旧会话处置指南
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
+import platform
 import subprocess
 import sys
 import uuid
@@ -56,6 +62,14 @@ CONTINUATION_TEMPLATE = """\
 
 ## 注意事项
 {notes}
+
+## 新会话恢复
+新会话 READ_CONTEXT 读取本文件后，执行自动恢复：
+  python adapters/cc/transition_state.py --auto-recover
+这会清除旋转标记 + 重置 WU 计数器 + claim session ownership。
+
+## 旧会话处置
+{old_session_guide}
 """
 
 
@@ -111,11 +125,11 @@ def write_continuation(
     completed: str = "",
     next_steps: str = "1. 运行 READ_CONTEXT 读取 state.json 和 continuation.md\n2. 接上状态机继续执行\n",
     notes: str = "（无特殊注意事项）",
+    old_session_guide: str = "",
 ) -> Path:
     """写入 .deepship/continuation.md，返回文件路径。"""
     info = _get_current_wu_info(root)
 
-    # 自动生成 completed（如果没给）
     if not completed:
         completed_lines = []
         for w in info["wus"]:
@@ -123,7 +137,6 @@ def write_continuation(
                 completed_lines.append(f"- {w['id']}: {w.get('goal', '?')} — {w['status']}")
         completed = "\n".join(completed_lines) if completed_lines else "（暂无已完成的 WU）"
 
-    # 如果没有提供 diff_intent，尝试从 git 获取
     if diff_intent == "（见 git diff）":
         try:
             diff_result = subprocess.run(
@@ -135,6 +148,9 @@ def write_continuation(
         except Exception:
             pass
 
+    if not old_session_guide:
+        old_session_guide = _build_old_session_guide(kill_old=False)
+
     content = CONTINUATION_TEMPLATE.format(
         timestamp=datetime.now(timezone.utc).isoformat(),
         current_state=info["current_state"],
@@ -145,12 +161,71 @@ def write_continuation(
         diff_intent=diff_intent,
         next_steps=next_steps,
         notes=notes,
+        old_session_guide=old_session_guide,
     )
 
     cont_path = root / DEEPSHIP_DIR / "continuation.md"
     cont_path.write_text(content, encoding="utf-8")
     print(f"[ROTATE] continuation.md 已写入: {cont_path}")
     return cont_path
+
+
+# ── 旧会话处置 ──────────────────────────────────────────
+
+def kill_old_session() -> dict:
+    """平台检测，尝试杀旧终端进程。返回 {'killed': bool, 'platform': str, 'detail': str}。"""
+    system = platform.system()
+    result = {"killed": False, "platform": system, "detail": ""}
+
+    if system == "Windows":
+        # taskkill 当前控制台进程树
+        try:
+            pid = os.getppid()
+            proc = subprocess.run(
+                ["taskkill", "/PID", str(pid), "/T", "/F"],
+                capture_output=True, text=True, timeout=15,
+            )
+            result["detail"] = proc.stdout.strip() or proc.stderr.strip()
+            result["killed"] = proc.returncode == 0
+        except Exception as e:
+            result["detail"] = str(e)
+    elif system in ("Linux", "Darwin"):
+        # 杀父 shell 及其子进程
+        try:
+            ppid = os.getppid()
+            proc = subprocess.run(
+                ["pkill", "-P", str(ppid)],
+                capture_output=True, text=True, timeout=15,
+            )
+            result["detail"] = proc.stdout.strip() or proc.stderr.strip()
+            result["killed"] = proc.returncode == 0
+        except Exception as e:
+            result["detail"] = str(e)
+    else:
+        result["detail"] = f"不支持的操作系统: {system}"
+
+    return result
+
+
+def _build_old_session_guide(kill_old: bool = False) -> str:
+    """构建旧会话处置指南文本。"""
+    guide = ""
+
+    if kill_old:
+        kill_result = kill_old_session()
+        if kill_result["killed"]:
+            guide = f"已通过平台检测 ({kill_result['platform']}) 杀旧终端进程。\n详情: {kill_result['detail']}"
+        else:
+            guide = (f"平台检测 ({kill_result['platform']}) 杀旧终端失败。\n"
+                     f"详情: {kill_result['detail']}\n"
+                     "请手动关闭旧终端窗口，避免双会话并行冲突。")
+    else:
+        guide = ("旋转后旧终端仍在运行。建议操作：\n"
+                 "1. 关闭旧终端窗口\n"
+                 "2. 或在旧终端执行 `exit`\n"
+                 "3. 如已丢失旧终端，新会话的 --auto-recover + session ownership 可防止旧会话写入")
+
+    return guide
 
 
 # ── 新终端启动 ──────────────────────────────────────────
@@ -194,10 +269,12 @@ def rotate(
     next_steps: str = "",
     notes: str = "",
     no_spawn: bool = False,
+    kill_old: bool = False,
 ) -> Path | None:
     """主入口：写 continuation.md → 开新终端。
 
-    返回 continuation.md 路径，如果 no_spawn 则不开终端。
+    返回 continuation.md 路径。
+    kill_old=True 时尝试平台检测杀旧终端。
     """
     root = project_root or find_deepship_root()
     if root is None:
@@ -243,12 +320,14 @@ def rotate(
     print(f"[ROTATE] 状态: {info['current_state']}, WU: {current_wu_id} ({info['wu_status']})")
 
     # 写 continuation.md
+    old_session_guide = _build_old_session_guide(kill_old=kill_old)
     cont_path = write_continuation(
         root,
         diff_intent=diff_intent or "（见 git diff）",
         completed=completed,
         next_steps=next_steps or "1. READ_CONTEXT 读 state.json + continuation.md\n2. 接上状态机继续执行\n",
         notes=notes or "（无特殊注意事项）",
+        old_session_guide=old_session_guide,
     )
 
     # 更新 state.json：标记旋转 + rotation_pending 门禁
@@ -274,39 +353,22 @@ def rotate(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="DEEPSHIP Session Rotator v0.1 —— 保存 checkpoint + 启动新终端继续",
+        description="DEEPSHIP Session Rotator v0.2 —— 保存 checkpoint + 启动新终端继续",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""\
 示例:
-  python adapters/parallel/rotate.py
+  python adapters/parallel/rotate.py --diff-intent "重构了 token 验证" --next-steps "1. pytest 2. VALIDATE"
   python adapters/parallel/rotate.py --no-spawn
-  python adapters/parallel/rotate.py --diff-intent "重构了 token 验证" --notes "test_logout 偶发失败"
+  python adapters/parallel/rotate.py --kill-old --diff-intent "重构了 token 验证" --next-steps "1. pytest"
         """,
     )
-    parser.add_argument(
-        "--project-root", "-d", type=str,
-        help="项目根目录（默认：自动检测）",
-    )
-    parser.add_argument(
-        "--diff-intent", type=str, default="",
-        help="当前 diff 的意图描述",
-    )
-    parser.add_argument(
-        "--completed", type=str, default="",
-        help="已完成工作的描述",
-    )
-    parser.add_argument(
-        "--next-steps", type=str, default="",
-        help="下一步必须做的操作",
-    )
-    parser.add_argument(
-        "--notes", type=str, default="",
-        help="注意事项（坑/已知问题）",
-    )
-    parser.add_argument(
-        "--no-spawn", action="store_true",
-        help="只写 continuation.md，不启动新终端",
-    )
+    parser.add_argument("--project-root", "-d", type=str, help="项目根目录（默认：自动检测）")
+    parser.add_argument("--diff-intent", type=str, default="", help="当前 diff 的意图描述")
+    parser.add_argument("--completed", type=str, default="", help="已完成工作的描述")
+    parser.add_argument("--next-steps", type=str, default="", help="下一步必须做的操作")
+    parser.add_argument("--notes", type=str, default="", help="注意事项（坑/已知问题）")
+    parser.add_argument("--no-spawn", action="store_true", help="只写 continuation.md，不启动新终端")
+    parser.add_argument("--kill-old", action="store_true", help="尝试平台检测杀旧终端进程（Windows: taskkill, Unix: pkill）")
 
     args = parser.parse_args()
 
@@ -318,6 +380,7 @@ def main() -> None:
         next_steps=args.next_steps,
         notes=args.notes,
         no_spawn=args.no_spawn,
+        kill_old=args.kill_old,
     )
 
 

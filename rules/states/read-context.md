@@ -13,6 +13,24 @@
 - [ ] `Plan.md` → 当前 milestone、AC、验证命令
 - [ ] `Documentation.md` → 当前进度、已知问题、最近决策
 
+## 允许的工具
+
+READ_CONTEXT 是纯观察状态，但观察不等于「只能看固定文件」：
+
+| 类别 | 允许？ | 说明 |
+|------|--------|------|
+| `read`（read_file, grep, glob, git status/log/diff） | ✅ ALLOW | 核心观察工具 |
+| `read_exec`（只读 bash：ls, cat, npm/pip list, node -v 等） | ✅ ALLOW | 用于勘察项目现状（依赖安装状态、文件是否存在等） |
+| `skill_user`（用户显式 /skill 调用） | ✅ ALLOW | 用户主动输入的命令，不拦截 |
+| `skill_auto`（模型自动搜索/匹配 skill） | 🚫 MUST NOT | 属于解空间思维，应在 PLAN_STEP 进行 |
+| `code_write` | 🚫 MUST NOT | 改代码不是观察 |
+| `exec`（变更 bash：npm install, pytest, build 等） | 🚫 MUST NOT | 有副作用，不在 READ_CONTEXT 做 |
+| `doc_write` | 🚫 MUST NOT | 写文档不是观察 |
+
+### 为什么 skill_auto 被挡？
+
+「看到项目结构 → 自动搜匹配的 skill」本质是**解空间思维**——你还没读完上下文就开始想用什么工具解决。正确的流程是：先完成 READ_CONTEXT 收集全貌 → 推进到 PLAN_STEP → 在规划时匹配合适的技能。
+
 ## 退出条件
 
 能回答以下问题才算完成：
@@ -32,14 +50,9 @@
 - [ ] **必须读取** `.deepship/continuation.md`
 - [ ] 必须在回复中引用 continuation.md 的 `next_steps`
 - [ ] 确认已理解"我在哪 / 已完成 / diff 意图 / 下一步"
-- [ ] 确认后，清除 `state.json` 中的 `_rotation_pending` 字段：
+- [ ] 确认后，执行自动恢复（清除旋转标记 + 声明 session ownership）：
   ```bash
-  python -c "
-  import json
-  s = json.load(open('.deepship/state.json'))
-  s.pop('_rotation_pending', None)
-  json.dump(s, open('.deepship/state.json', 'w'), indent=2, ensure_ascii=False)
-  "
+  python adapters/cc/transition_state.py --auto-recover
   ```
 - [ ] 直到 `_rotation_pending` 清除后才能 `transition_state.py --to EXECUTE`
 - [ ] 旧 `continuation.md` 可以在 RECORD 后删除

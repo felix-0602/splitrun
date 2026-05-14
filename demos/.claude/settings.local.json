@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python transition_state.py --to READ_CONTEXT)",
+      "Bash(python adapters/cc/transition_state.py --to READ_CONTEXT)",
+      "Bash(python *)",
+      "Bash(node -e \"require\\('./deepship-policy-guard.js'\\)\")",
+      "Bash(node --check \"C:/Users/27464/.claude/DEEPSHIP/adapters/claude-code/hooks/deepship-policy-guard.js\")",
+      "Bash(node *)"
+    ]
+  }
+}

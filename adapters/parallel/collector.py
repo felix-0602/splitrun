@@ -109,6 +109,39 @@ def validate_format(result: dict, wu_id: str) -> list[str]:
 # ── 收集 ────────────────────────────────────────────────
 
 
+def validate_review(result: dict, wu: dict) -> tuple[bool, str]:
+    """检查 code review 证据 — 硬门禁。
+
+    规则（来自 rules/states/execute.md + rules/states/advance.md）：
+      - risk_level=medium/high: 必须 review_status=passed + review_evidence 非空
+      - risk_level=low: 至少 review_status 非空（passed/skipped），skipped 必须有理由
+      - 缺失 review_status → FAIL
+    """
+    risk = wu.get("risk_level", "medium")
+    review_status = result.get("review_status")
+    review_evidence = result.get("review_evidence")
+
+    if not review_status:
+        return False, f"缺少 review_status（risk_level={risk}，不允许跳过）"
+
+    if review_status == "passed":
+        if not review_evidence:
+            return False, "review_status=passed 但缺少 review_evidence"
+        return True, f"review 通过"
+
+    if review_status == "skipped":
+        if risk in ("medium", "high"):
+            return False, f"risk_level={risk} 不允许跳过 review（仅 low 可豁免）"
+        if not review_evidence:
+            return False, "review_status=skipped 但缺少 review_evidence（需写明豁免理由）"
+        return True, f"review 豁免（理由已记录）"
+
+    if review_status == "failed":
+        return False, f"review 未通过: {review_evidence or '无详细信息'}"
+
+    return False, f"未知 review_status: {review_status}"
+
+
 def collect_results(
     project_root: Path,
     wu_ids: list[str] | None = None,
@@ -218,6 +251,11 @@ def collect(
         if not tests_ok:
             issues.append(f"测试不足: {tests_msg}")
 
+        # 审查检查（硬门禁）
+        review_ok, review_msg = validate_review(result, wu)
+        if not review_ok:
+            issues.append(f"审查未通过: {review_msg}")
+
         status = result.get("status", "?")
         icon = "PASS" if not issues and status == "done" else "FAIL"
 
@@ -226,6 +264,8 @@ def collect(
         print(f"       状态: {status}")
         print(f"       文件: {result.get('changed_files', [])}")
         print(f"       测试: {result.get('tests_run', [])}")
+        if result.get("review_status"):
+            print(f"       审查: {result.get('review_status')}")
         if result.get("risks"):
             print(f"       风险: {result.get('risks')}")
         if issues:

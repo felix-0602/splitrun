@@ -49,3 +49,17 @@ COMPLETE → （终态，等待用户新请求 → READ_CONTEXT）
 | → COMPLETE | 所有 milestone 完成 且 所有 WU `integrated`（或无 WU 文档任务） |
 | → REPAIR | VALIDATE 失败（有失败输出为证），且连续轮数 < 3 |
 | → BLOCK | 冲突无法消解 或 REPAIR 连续 3 轮失败 |
+## PLAN_STEP Dynamic Planning Addendum
+
+PLAN_STEP is not only WU decomposition. When multiple conversations are present,
+it also owns plan reconciliation:
+
+- read `.deepship/sessions.json` before accepting a new session as executor
+- classify the new request as duplicate, owner-scoped, new-lane goal, or conflict
+- write `.deepship/plan-revisions/*.md` for accepted plan changes
+- write `.deepship/a2a/*.json` for handoffs and lane contracts
+- write `.deepship/prompt-supplements/*.md` so the owner/lane can update prompt context
+- block lane/worktree creation until the A2A contract defines boundaries,
+  interfaces, validation, and integration owner
+
+Normal WU execution remains unchanged after reconciliation completes.
