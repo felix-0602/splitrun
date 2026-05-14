@@ -3,6 +3,7 @@
 
 var pg = require('./policy-gate.js');
 var path = require('path');
+var fs = require('fs');
 
 // ── Transition validation ─────────────────────────────────
 
@@ -80,10 +81,10 @@ function laneNameFromPath(target, root) {
 
 function laneHasA2AContract(root, laneName) {
   var direct = path.join(root, '.deepship', 'a2a', laneName + '.json');
-  if (require('fs').existsSync(direct)) return true;
+  if (fs.existsSync(direct)) return true;
   var dir = path.join(root, '.deepship', 'a2a');
   try {
-    return require('fs').readdirSync(dir).some(function(entry) {
+    return fs.readdirSync(dir).some(function(entry) {
       return entry.endsWith('.json') && entry.includes(laneName);
     });
   } catch (_) { return false; }

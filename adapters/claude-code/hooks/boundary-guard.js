@@ -2,6 +2,7 @@
 // Requires policy-gate.js.
 
 var pg = require('./policy-gate.js');
+var path = require('path');
 
 // ── Work unit boundary ───────────────────────────────────
 
@@ -21,7 +22,7 @@ function allowedByWorkUnit(target, root, workUnit) {
   return allowed.some(function(entry) {
     if (typeof entry !== 'string' || !entry.trim()) return false;
     var raw = entry.replace(/\\/g, '/');
-    var absolute = require('path').isAbsolute(raw) ? raw : require('path').join(root, raw);
+    var absolute = path.isAbsolute(raw) ? raw : path.join(root, raw);
     var pattern = pg.normalize(absolute);
     if (pattern.includes('*')) return globToRegExp(pattern).test(targetNorm);
     return targetNorm === pattern || pg.isWithin(targetNorm, pattern);
