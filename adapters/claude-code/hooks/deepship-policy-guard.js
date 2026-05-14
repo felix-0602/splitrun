@@ -24,7 +24,7 @@ async function main() {
   // ── Transition validation ─────────────────────────────
   if (cg.TRANSITION_TOOLS.has(toolName)) {
     var transErr = cg.validateTransition(root, data.tool_input);
-    if (transErr) { pg.deny(transErr); return; }
+    if (transErr) { pg.deny(transErr, 'transition/legal'); return; }
     return;
   }
 
@@ -33,7 +33,6 @@ async function main() {
     var st = pg.readJson(path.join(root, '.deepship', 'state.json'));
     var cs = ((st && st.current_state) || 'READ_CONTEXT').toUpperCase();
     // CC PreToolUse hook 无法区分 skill_user vs skill_auto；仅记录警告不阻断
-    // 完整 skill_auto 阻断需等 CC 提供 invocation source 字段
   }
 
   // ── Bash exec 分类拦截 ────────────────────────────────
@@ -43,7 +42,7 @@ async function main() {
     var metadataTarget = cmd ? bg.bashWritesMetadata(cmd) : null;
     if (metadataTarget) {
       pg.deny('DEEPSHIP BLOCK: Bash command redirects to metadata file ' + metadataTarget +
-              '. Use transition_state.py for state changes, RECORD state for documentation.');
+              '. Use transition_state.py for state changes, RECORD state for documentation.', 'policy/exec-gate');
       return;
     }
 
@@ -52,7 +51,7 @@ async function main() {
       var bcs = ((bst && bst.current_state) || 'READ_CONTEXT').toUpperCase();
       var bp = pg.POLICY[bcs];
       if (bp && !bp.exec) {
-        pg.deny('DEEPSHIP BLOCK: ' + bcs + ' does not allow exec (destructive Bash). Command: ' + cmd.substring(0, 80));
+        pg.deny('DEEPSHIP BLOCK: ' + bcs + ' does not allow exec (destructive Bash). Command: ' + cmd.substring(0, 80), 'policy/exec-gate');
         return;
       }
     }
@@ -62,7 +61,7 @@ async function main() {
       var abcs = ((abst && abst.current_state) || 'READ_CONTEXT').toUpperCase();
       var abp = pg.POLICY[abcs];
       if (abp && !abp.code_write) {
-        pg.deny('DEEPSHIP BLOCK: ' + abcs + ' does not allow code_write — Bash file-write attempt blocked by anti-bypass guard. Use a state that allows code_write, or trigger revolution approval. Command: ' + cmd.substring(0, 100));
+        pg.deny('DEEPSHIP BLOCK: ' + abcs + ' does not allow code_write — Bash file-write attempt blocked by anti-bypass guard.', 'policy/code-write');
         return;
       }
     }
@@ -76,7 +75,7 @@ async function main() {
 
   if (!root) {
     if (pg.looksLikeDeepShipFramework(cwd)) {
-      pg.deny('DEEPSHIP BLOCK: DEEPSHIP framework repo has no .deepship/ state. Initialize dogfood state first: mkdir -p .deepship && copy templates from ~/.claude/DEEPSHIP/templates/');
+      pg.deny('DEEPSHIP BLOCK: DEEPSHIP framework repo has no .deepship/ state. Initialize dogfood state first.', 'policy/state-write');
     }
     return;
   }
@@ -84,29 +83,29 @@ async function main() {
   var targetAbs = path.resolve(cwd, target);
   if (!pg.isWithin(targetAbs, root)) {
     if (bg.isTrustedWriteTarget(targetAbs)) return;
-    pg.deny('DEEPSHIP BLOCK: write target is outside project root: ' + targetAbs);
+    pg.deny('DEEPSHIP BLOCK: write target is outside project root: ' + targetAbs, 'policy/wu-boundary');
     return;
   }
 
   // ── Coordination guards ────────────────────────────────
   var err;
   err = cg.laneCreationContractViolation(targetAbs, root);
-  if (err) { pg.deny("DEEPSHIP BLOCK: lane '" + err + "' cannot be created or written before an A2A contract exists in .deepship/a2a/."); return; }
+  if (err) { pg.deny("DEEPSHIP BLOCK: lane '" + err + "' cannot be created or written before an A2A contract exists in .deepship/a2a/.", 'coordination/lane-contract'); return; }
 
   err = cg.laneMetadataDirectWriteViolation(targetAbs, root, cwd);
-  if (err) { pg.deny('DEEPSHIP BLOCK: main session cannot write active lane metadata directly. Lane: ' + err + '. Open the lane worktree and write there.'); return; }
+  if (err) { pg.deny('DEEPSHIP BLOCK: main session cannot write active lane metadata directly. Lane: ' + err + '. Open the lane worktree and write there.', 'coordination/lane-contract'); return; }
 
   err = cg.activeLaneCollision(targetAbs, root, data.tool_input || {});
-  if (err) { pg.deny('DEEPSHIP BLOCK: attempted to write active lane work units into main workspace metadata. Lane: ' + err + '. Open the lane worktree and write its .deepship/work_units.json there.'); return; }
+  if (err) { pg.deny('DEEPSHIP BLOCK: active lane work unit collision. Lane: ' + err, 'coordination/lane-contract'); return; }
 
   err = cg.activeLaneMetadataCollision(targetAbs, root, data.tool_input || {});
-  if (err) { pg.deny('DEEPSHIP BLOCK: attempted to write active lane metadata into main workspace metadata. Lane: ' + err + '.'); return; }
+  if (err) { pg.deny('DEEPSHIP BLOCK: active lane metadata collision. Lane: ' + err, 'coordination/lane-contract'); return; }
 
   err = cg.requiresRootSessionOwner(targetAbs, root, cwd);
-  if (err) { pg.deny('DEEPSHIP BLOCK: ' + err + '.'); return; }
+  if (err) { pg.deny('DEEPSHIP BLOCK: ' + err, 'coordination/session-owner'); return; }
 
   err = cg.workUnitsIntegrityViolation(targetAbs, root, data.tool_input || {});
-  if (err) { pg.deny('DEEPSHIP BLOCK: ' + err + '.'); return; }
+  if (err) { pg.deny('DEEPSHIP BLOCK: ' + err, 'coordination/wu-integrity'); return; }
 
   // ── State-gated permission check ───────────────────────
   var statePath = path.join(root, '.deepship', 'state.json');
@@ -114,20 +113,20 @@ async function main() {
   var state = pg.readJson(statePath);
   if (!(state && state.current_state)) {
     if (pg.isBootstrapWrite(targetAbs, root)) return;
-    pg.deny('DEEPSHIP BLOCK: .deepship/state.json is missing or invalid; enter READ_CONTEXT/init first.');
+    pg.deny('DEEPSHIP BLOCK: .deepship/state.json is missing or invalid; enter READ_CONTEXT/init first.', 'policy/state-write');
     return;
   }
 
   var currentState = state.current_state;
   var policy = pg.POLICY[currentState];
   if (!policy) {
-    pg.deny("DEEPSHIP BLOCK: unknown state '" + currentState + "' — no policy entry.");
+    pg.deny("DEEPSHIP BLOCK: unknown state '" + currentState + "' — no policy entry.", 'transition/legal');
     return;
   }
 
   var kind = pg.writeKind(targetAbs, root);
   if (pg.isDynamicPlanningArtifact(targetAbs, root) && currentState !== 'PLAN_STEP') {
-    pg.deny('DEEPSHIP BLOCK: ' + currentState + ' cannot write dynamic planning artifact (' + targetAbs + '); use PLAN_STEP.');
+    pg.deny('DEEPSHIP BLOCK: ' + currentState + ' cannot write dynamic planning artifact (' + targetAbs + '); use PLAN_STEP.', 'policy/code-write');
     return;
   }
 
@@ -136,7 +135,8 @@ async function main() {
   if (!policyKey) return;
 
   if (!policy[policyKey]) {
-    pg.deny('DEEPSHIP BLOCK: ' + currentState + ' does not allow ' + kind + ' (' + targetAbs + '). policy.' + policyKey + '=false.');
+    var ruleId = kind === 'state_write' ? 'policy/state-write' : (kind === 'code_write' ? 'policy/code-write' : 'policy/code-write');
+    pg.deny('DEEPSHIP BLOCK: ' + currentState + ' does not allow ' + kind + ' (' + targetAbs + '). policy.' + policyKey + '=false.', ruleId);
     return;
   }
 
@@ -153,7 +153,7 @@ async function main() {
       var reason = generationMismatch
         ? 'session replaced — your session started at ' + myGen + ', owner started at ' + ownerGen
         : 'not session owner. Owner worktree: ' + session.owner_worktree + ', current: ' + cwd;
-      pg.deny('DEEPSHIP BLOCK: ' + reason);
+      pg.deny('DEEPSHIP BLOCK: ' + reason, 'coordination/session-owner');
       return;
     }
   }
@@ -161,7 +161,7 @@ async function main() {
   // ── EXECUTE/REPAIR: work unit boundary ─────────────────
   if (kind === 'code_write' && (currentState === 'EXECUTE' || currentState === 'REPAIR')) {
     if (pg.isMetadataWrite(targetAbs, root)) {
-      pg.deny('DEEPSHIP BLOCK: EXECUTE/REPAIR cannot directly edit DEEPSHIP metadata; use RECORD.');
+      pg.deny('DEEPSHIP BLOCK: EXECUTE/REPAIR cannot directly edit DEEPSHIP metadata; use RECORD.', 'policy/state-write');
       return;
     }
 
@@ -174,12 +174,12 @@ async function main() {
     }
 
     if (!currentWu) {
-      pg.deny('DEEPSHIP BLOCK: no current_work_unit found; PLAN_STEP must create/select a work unit before code edits.');
+      pg.deny('DEEPSHIP BLOCK: no current_work_unit found; PLAN_STEP must create/select a work unit before code edits.', 'policy/wu-boundary');
       return;
     }
 
     if (!bg.allowedByWorkUnit(targetAbs, root, currentWu)) {
-      pg.deny('DEEPSHIP BLOCK: target is outside current work unit files_allowed: ' + targetAbs);
+      pg.deny('DEEPSHIP BLOCK: target is outside current work unit files_allowed: ' + targetAbs, 'policy/wu-boundary');
     }
   }
 }

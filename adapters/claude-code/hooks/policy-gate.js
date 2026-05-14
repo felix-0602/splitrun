@@ -26,12 +26,13 @@ const TRUSTED_CONFIG = path.join(process.env.USERPROFILE || process.env.HOME || 
 const DEEPSHIP_STATE_FILES = ['state.json', 'work_units.json', 'log.jsonl'];
 const PROJECT_DOC_FILES = ['Documentation.md', 'CHANGELOG.md', 'README.md', 'Prompt.md', 'Plan.md'];
 
-function deny(reason) {
+function deny(reason, ruleId) {
   process.stdout.write(JSON.stringify({
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
       permissionDecision: 'deny',
       permissionDecisionReason: reason,
+      ruleId: ruleId || '',
     },
   }));
 }
