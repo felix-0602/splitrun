@@ -49,7 +49,7 @@ if idx.exists():
         if info.get('status') != 'active':
             continue
         wt = info.get('worktree', '')
-        report_path = Path(wt) / '.deepship' / 'report.json' if wt else None
+        report_path = Path(wt) / '.splitrun' / 'report.json' if wt else None
         if report_path and report_path.exists():
             r = json.loads(report_path.read_text(encoding='utf-8'))
             print(f'{lid} | {r.get(\"status\",\"?\")} | {r.get(\"result\",\"?\")[:80]}')
