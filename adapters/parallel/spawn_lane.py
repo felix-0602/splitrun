@@ -23,19 +23,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-try:
-    from adapters.parallel.dispatcher import (
-        DEEPSHIP_DIR,
-        WORKTREE_PARENT,
-        _check_wt_available,
-        create_worktree,
-        find_deepship_root,
-    )
-except ModuleNotFoundError:
-    _here = Path(__file__).resolve().parents[2]
-    if str(_here) not in sys.path:
-        sys.path.insert(0, str(_here))
-    from adapters.parallel.dispatcher import (
+# Support direct CLI invocation: python adapters/parallel/spawn_lane.py --list
+if __name__ == "__main__" and __package__ is None:
+    _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+    sys.path.insert(0, str(_PROJECT_ROOT))
+
+from adapters.parallel._utils import (
         DEEPSHIP_DIR,
         WORKTREE_PARENT,
         _check_wt_available,
@@ -188,7 +181,11 @@ worktree: {worktree_path}
 Lane ID: {lane_id}. 执行 READ_CONTEXT:
 1. 读取 .deepship/lane_id.json 确认身份
 2. 读取本文件了解任务
-3. 按 DEEPSHIP 状态机独立流转
+3. 在 files_claimed 边界内完成工作
+4. 完成后写 .deepship/report.json 格式:
+   {"lane_id": "{lane_id}", "status": "done|blocked",
+    "changed_files": [...], "test_results": "...",
+    "result": "一句话总结"}
 """
     task_path = task_dir / f"{lane_id}.md"
     task_path.write_text(task_content, encoding="utf-8")
@@ -289,7 +286,7 @@ class LaneSpawner:
 
         print(f"[LANE] {lane_id} creating...")
 
-        wt_path = create_worktree(self.root, lane_id)
+        wt_path = create_worktree(lane_id, project_root=self.root)
         if wt_path is None:
             raise RuntimeError(f"Worktree creation failed: {lane_id}")
 

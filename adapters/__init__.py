@@ -1,1 +1,1 @@
-"""DEEPSHIP adapters — runtime-specific implementations of the DEEPSHIP protocol."""
+"""DEEPSHIP v0 adapters — Brain dispatch/monitor + Lane spawner."""

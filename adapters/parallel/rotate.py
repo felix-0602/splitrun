@@ -23,18 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 # 支持直接执行或模块导入
-try:
-    from adapters.parallel.dispatcher import (
-        DEEPSHIP_DIR,
-        find_deepship_root,
-        _check_wt_available,
-        _validate_wu_id,
-    )
-except ModuleNotFoundError:
-    _here = Path(__file__).resolve().parents[2]
-    if str(_here) not in sys.path:
-        sys.path.insert(0, str(_here))
-    from adapters.parallel.dispatcher import (
+from adapters.parallel._utils import (
         DEEPSHIP_DIR,
         find_deepship_root,
         _check_wt_available,

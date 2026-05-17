@@ -12,5 +12,12 @@ desktop.ini
 # Python caches
 __pycache__/
 *.py[cod]
+
+# DEEPSHIP runtime state (generated per-session)
+.deepship/lanes/
+.deepship/lane_plan.json
+.deepship/scope.md
+.deepship/land-report.md
+.deepship/index.json
 .deepship/*.bak
 .planning/
