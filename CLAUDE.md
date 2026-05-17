@@ -1,18 +1,34 @@
-## Skill routing
+## DEEPSHIP v0.1.1
 
-When the user's request matches an available skill, invoke it via the Skill tool. When in doubt, invoke the skill.
+四个按需命令的并行 Lane 框架。不做常驻，只在需要时调用。
 
-Key routing rules:
-- Product ideas/brainstorming → invoke /office-hours
-- Strategy/scope → invoke /plan-ceo-review
-- Architecture → invoke /plan-eng-review
-- Design system/plan review → invoke /design-consultation or /plan-design-review
-- Full review pipeline → invoke /autoplan
-- Bugs/errors → invoke /investigate
-- QA/testing site behavior → invoke /qa or /qa-only
-- Code review/diff check → invoke /review
-- Visual polish → invoke /design-review
-- Ship/deploy/PR → invoke /ship or /land-and-deploy
-- Save progress → invoke /context-save
-- Resume context → invoke /context-restore
-- Parallel task execution → invoke /deepship-scope, /deepship-spawn, /deepship-status, /deepship-land
+| 命令 | 角色 |
+|------|------|
+| `/deepship-scope` | 任务共识对齐，判断是否值得并行 |
+| `/deepship-spawn` | 拆 WU，开隔离 worktree，并行启动 CC |
+| `/deepship-status` | 聚合 Lane 状态，判定能否 land |
+| `/deepship-land` | Boundary/Evidence/Integration 检查 + merge |
+
+闭环: `scope → spawn → status → land`
+
+### Self-verification
+
+```bash
+python checks/verify.py       # 烟测
+python -m pytest tests/conformance/ -q  # 57 contract tests
+```
+
+### Key modules
+
+- `adapters/gates.py` — 硬门禁（boundary/land/schema/recommendation）
+- `adapters/brain/dispatch.py` — WU 分组，写 lane_plan.json（plan-only）
+- `adapters/brain/monitor.py` — 读 Lane report，判定 merge/replan
+- `adapters/parallel/spawn_lane.py` — 创建 worktree + 注册 lane index
+- `checks/verify.py` — 框架自检（core code + lane index + scope + gates）
+- `tests/conformance/` — 57 contract tests
+
+### Conventions
+
+- Lane index schema: `status`, `task`, `worktree`, `files_claimed`, `spawned_at`
+- recommendation 字段: `spawn` | `do_not_spawn`（下划线，机器可读）
+- BP: 在不破坏 contract tests 和 verify.py 的前提下改动
