@@ -63,12 +63,15 @@ DEEPSHIP/
 │   ├── brain/                  # WU 分派 + Lane 监控
 │   │   ├── dispatch.py
 │   │   └── monitor.py
-│   └── parallel/               # Lane 创建 + 工具函数
-│       ├── spawn_lane.py
-│       ├── _utils.py
-│       └── rotate.py
+│   ├── parallel/               # Lane 创建 + 工具函数
+│   │   ├── spawn_lane.py
+│   │   ├── _utils.py
+│   │   └── rotate.py
+│   └── gates.py                # 硬门禁（boundary/land/schema/recommendation）
 ├── checks/
 │   └── verify.py               # 框架自检
+├── tests/
+│   └── conformance/            # 57 个 contract tests
 ├── CLAUDE.md                   # Skill 路由规则
 └── README.md
 ```
