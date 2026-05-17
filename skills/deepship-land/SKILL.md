@@ -1,9 +1,9 @@
 ---
 name: deepship-land
 description: |
-  Land parallel lanes — collect reports, run boundary/evidence/integration checks,
-  merge git branches, clean up worktrees, and produce a delivery summary.
-  This is the heaviest command. All three gate checks must pass before merge.
+  收敛并行 Lane——收集 report、跑 Boundary/Evidence/Integration 三道门禁、合并 git 分支、清理 worktree。
+  输出 .deepship/land-report.md 作为交付证据。三道检查全部通过才能 merge。
+  Triggers: 所有 lane 都 done、用户说"合并""收一下""land""交付""收尾"。
 allowed-tools:
   - Read
   - Write

@@ -1,9 +1,9 @@
 ---
 name: deepship-spawn
 description: |
-  Read confirmed scope.md, break into work units, spawn isolated Claude Code
-  sessions in parallel git worktrees. Each lane gets its own worktree, task file,
-  and terminal window. User confirms WU split and file boundaries before spawning.
+  当 scope.md 已有且 recommendation=spawn 时触发。读 scope.md，拆 Work Unit，
+  在隔离 git worktree 中并行启动 Claude Code 会话。用户确认拆分方案后才启动。
+  Triggers: scope.md 已确认、用户说"开始做""启动 lane""spawn""拆任务"。
 allowed-tools:
   - Read
   - Write

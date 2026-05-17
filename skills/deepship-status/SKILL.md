@@ -1,9 +1,8 @@
 ---
 name: deepship-status
 description: |
-  Check all active lanes — which are done, blocked, still running, or have gone
-  out-of-bounds. Determines whether the current state allows landing.
-  Read-only, no mutations.
+  查看所有活跃 Lane 的状态——哪些 done、blocked、还在跑、越界。判定能不能 land。只读，不改任何文件。
+  Triggers: 用户问"进度怎么样""做完了吗""看一下 lane""status""状态"、lane 跑了一段时间。
 allowed-tools:
   - Read
   - Bash
