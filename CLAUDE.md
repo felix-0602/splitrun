@@ -1,13 +1,13 @@
-## DEEPSHIP v0.1.1
+## SPLITRUN v0.1.1
 
 四个按需命令的并行 Lane 框架。不做常驻，只在需要时调用。
 
 | 命令 | 角色 |
 |------|------|
-| `/deepship-scope` | 任务共识对齐，判断是否值得并行 |
-| `/deepship-spawn` | 拆 WU，开隔离 worktree，并行启动 CC |
-| `/deepship-status` | 聚合 Lane 状态，判定能否 land |
-| `/deepship-land` | Boundary/Evidence/Integration 检查 + merge |
+| `/splitrun-scope` | 任务共识对齐，判断是否值得并行 |
+| `/splitrun-spawn` | 拆 WU，开隔离 worktree，并行启动 CC |
+| `/splitrun-status` | 聚合 Lane 状态，判定能否 land |
+| `/splitrun-land` | Boundary/Evidence/Integration 检查 + merge |
 
 闭环: `scope → spawn → status → land`
 

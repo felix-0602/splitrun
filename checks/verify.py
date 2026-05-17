@@ -1,5 +1,5 @@
 """
-DEEPSHIP v0 self-verification.
+SPLITRUN v0 self-verification.
 Zero external dependencies. Run from repo root:
   python checks/verify.py
 """
@@ -47,7 +47,7 @@ def check_core_code():
 def check_lane_index():
     """If lanes/index.json exists, validate its structure."""
     print("\n[2] Lane index integrity")
-    idx = ROOT / ".deepship" / "lanes" / "index.json"
+    idx = ROOT / ".splitrun" / "lanes" / "index.json"
     if not idx.exists():
         ok("no lanes/index.json — nothing to check")
         return
@@ -74,13 +74,13 @@ def check_lane_index():
 def check_scope():
     """If scope.md exists, verify it has required sections (current Chinese template)."""
     print("\n[3] Scope integrity")
-    scope = ROOT / ".deepship" / "scope.md"
+    scope = ROOT / ".splitrun" / "scope.md"
     if not scope.exists():
-        warn("no scope.md — run /deepship-scope before spawning")
+        warn("no scope.md — run /splitrun-scope before spawning")
         return
 
     text = scope.read_text(encoding="utf-8")
-    # 当前 deepship-scope 中文模板的必需段
+    # 当前 splitrun-scope 中文模板的必需段
     required_sections = [
         "已确认事实", "推断判断", "未知问题",
         "可能失败点", "拟拆分 Work Units", "建议",
@@ -105,7 +105,7 @@ def check_scope():
 def check_land_report():
     """If land-report.md exists, verify it has boundary/evidence/integration."""
     print("\n[4] Land report integrity")
-    lr = ROOT / ".deepship" / "land-report.md"
+    lr = ROOT / ".splitrun" / "land-report.md"
     if not lr.exists():
         ok("no land-report.md — nothing to check")
         return
@@ -153,7 +153,7 @@ def check_contracts():
         import inspect
         from adapters.brain.monitor import BrainMonitor as BM
         src = inspect.getsource(BM._read_lane_report)
-        if 'worktree' in src and '.deepship' in src and 'report.json' in src:
+        if 'worktree' in src and '.splitrun' in src and 'report.json' in src:
             ok("Monitor reads report from worktree path")
         else:
             err("Monitor._read_lane_report may not use worktree path")
@@ -217,7 +217,7 @@ def check_contracts():
 
 
 if __name__ == "__main__":
-    print(f"DEEPSHIP v0 verify — {ROOT}")
+    print(f"SPLITRUN v0 verify — {ROOT}")
     check_core_code()
     check_lane_index()
     check_scope()

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-DEEPSHIP Lane Spawner v0.1 — 即时 lane 创建，集成 worktree + 交互式终端.
+SPLITRUN Lane Spawner v0.1 — 即时 lane 创建，集成 worktree + 交互式终端.
 
 lane = git worktree + 独立 Claude Code 会话 + lane_id.json 自动身份发现.
 与 dispatcher 互补: dispatcher 批量分派预定义 WU (claude -p 非交互),
@@ -29,11 +29,11 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 from adapters.parallel._utils import (
-        DEEPSHIP_DIR,
+        SPLITRUN_DIR,
         WORKTREE_PARENT,
         _check_wt_available,
         create_worktree,
-        find_deepship_root,
+        find_splitrun_root,
     )
 
 LANES_DIR = "lanes"
@@ -66,7 +66,7 @@ def _claim_matches(pattern: str, target: str) -> bool:
 
 
 def _load_lane_index(project_root: Path) -> dict[str, Any]:
-    index_path = project_root / DEEPSHIP_DIR / LANES_DIR / "index.json"
+    index_path = project_root / SPLITRUN_DIR / LANES_DIR / "index.json"
     if not index_path.exists():
         return {}
     try:
@@ -129,7 +129,7 @@ def assert_no_file_claim_conflicts(
 
 
 def _next_lane_id(project_root: Path) -> str:
-    lanes_dir = project_root / DEEPSHIP_DIR / LANES_DIR
+    lanes_dir = project_root / SPLITRUN_DIR / LANES_DIR
     if not lanes_dir.exists():
         return "LANE-001"
     existing = []
@@ -148,16 +148,16 @@ def _next_lane_id(project_root: Path) -> str:
 
 
 def write_lane_identity(worktree_path: Path, lane_id: str, task_summary: str) -> Path:
-    """在 worktree 写入 .deepship/lane_id.json. 新会话 READ_CONTEXT 自动发现."""
-    lane_deepship = worktree_path / DEEPSHIP_DIR
-    lane_deepship.mkdir(parents=True, exist_ok=True)
+    """在 worktree 写入 .splitrun/lane_id.json. 新会话 READ_CONTEXT 自动发现."""
+    lane_splitrun = worktree_path / SPLITRUN_DIR
+    lane_splitrun.mkdir(parents=True, exist_ok=True)
     identity = {
         "lane_id": lane_id,
         "spawned_at": datetime.now(timezone.utc).isoformat(),
         "task_summary": task_summary,
         "status": "active",
     }
-    identity_path = lane_deepship / "lane_id.json"
+    identity_path = lane_splitrun / "lane_id.json"
     identity_path.write_text(
         json.dumps(identity, indent=2, ensure_ascii=False), encoding="utf-8"
     )
@@ -166,7 +166,7 @@ def write_lane_identity(worktree_path: Path, lane_id: str, task_summary: str) ->
 
 def write_lane_task(worktree_path: Path, lane_id: str, task: str) -> Path:
     """在 worktree 写入完整任务文件."""
-    task_dir = worktree_path / DEEPSHIP_DIR / LANES_DIR
+    task_dir = worktree_path / SPLITRUN_DIR / LANES_DIR
     task_dir.mkdir(parents=True, exist_ok=True)
     task_content = f"""# {lane_id}: Lane Task
 
@@ -179,10 +179,10 @@ worktree: {worktree_path}
 
 ## 开始
 Lane ID: {lane_id}. 执行 READ_CONTEXT:
-1. 读取 .deepship/lane_id.json 确认身份
+1. 读取 .splitrun/lane_id.json 确认身份
 2. 读取本文件了解任务
 3. 在 files_claimed 边界内完成工作
-4. 完成后写 .deepship/report.json 格式:
+4. 完成后写 .splitrun/report.json 格式:
    {"lane_id": "{lane_id}", "status": "done|blocked",
     "changed_files": [...], "test_results": "...",
     "result": "一句话总结"}
@@ -200,7 +200,7 @@ def register_lane(
     files_claimed: list[str] | None = None,
 ) -> None:
     """在主仓库 lanes/index.json 注册 lane."""
-    lanes_dir = project_root / DEEPSHIP_DIR / LANES_DIR
+    lanes_dir = project_root / SPLITRUN_DIR / LANES_DIR
     lanes_dir.mkdir(parents=True, exist_ok=True)
     index_path = lanes_dir / "index.json"
     index = {}
@@ -226,7 +226,7 @@ def register_lane(
 
 def _resolve_claude_permission_mode() -> str:
     """CC 默认 dontAsk → acceptEdits 解决 lane 写权限问题."""
-    return os.environ.get("DEEPSHIP_LANE_PERMISSION_MODE", "acceptEdits")
+    return os.environ.get("SPLITRUN_LANE_PERMISSION_MODE", "acceptEdits")
 
 
 def spawn_interactive_terminal(
@@ -265,9 +265,9 @@ class LaneSpawner:
     """Lane 创建器 -- 可编程接口."""
 
     def __init__(self, project_root: Path | None = None):
-        self.root = project_root or find_deepship_root()
+        self.root = project_root or find_splitrun_root()
         if self.root is None:
-            raise FileNotFoundError("No .deepship/ directory found.")
+            raise FileNotFoundError("No .splitrun/ directory found.")
 
     def spawn(
         self,
@@ -304,10 +304,10 @@ class LaneSpawner:
         register_lane(self.root, lane_id, task[:100], wt_path, files)
 
         initial_prompt = (
-            f"DEEPSHIP lane {lane_id} activated. "
-            f"Run READ_CONTEXT: read .deepship/lane_id.json, "
-            f"then .deepship/lanes/{lane_id}.md. "
-            f"Proceed through DEEPSHIP state machine independently."
+            f"SPLITRUN lane {lane_id} activated. "
+            f"Run READ_CONTEXT: read .splitrun/lane_id.json, "
+            f"then .splitrun/lanes/{lane_id}.md. "
+            f"Proceed through SPLITRUN state machine independently."
         )
 
         proc = spawn_interactive_terminal(lane_id, wt_path, initial_prompt)
@@ -329,12 +329,12 @@ class LaneSpawner:
 
 
 def list_active_lanes(project_root: Path | None = None) -> list[dict]:
-    root = project_root or find_deepship_root()
+    root = project_root or find_splitrun_root()
     if root is None:
-        print("[ERROR] No .deepship/ directory.")
+        print("[ERROR] No .splitrun/ directory.")
         return []
 
-    index_path = root / DEEPSHIP_DIR / LANES_DIR / "index.json"
+    index_path = root / SPLITRUN_DIR / LANES_DIR / "index.json"
     if not index_path.exists():
         print("(no active lanes)")
         return []
@@ -365,13 +365,13 @@ def list_active_lanes(project_root: Path | None = None) -> list[dict]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="DEEPSHIP Lane Spawner -- instant lane (worktree + interactive terminal)",
+        description="SPLITRUN Lane Spawner -- instant lane (worktree + interactive terminal)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""\
 Examples:
   python adapters/parallel/spawn_lane.py "fix profiles hook"
   python adapters/parallel/spawn_lane.py "refactor state machine" -f protocol/state-machine.md
-  python adapters/parallel/spawn_lane.py --task-file .deepship/lanes/my-task.md
+  python adapters/parallel/spawn_lane.py --task-file .splitrun/lanes/my-task.md
   python adapters/parallel/spawn_lane.py --list
         """,
     )

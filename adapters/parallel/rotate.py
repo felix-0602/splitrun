@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-DEEPSHIP Session Rotator v0.2 — 自旋转：保存 checkpoint → 开新终端继续.
+SPLITRUN Session Rotator v0.2 — 自旋转：保存 checkpoint → 开新终端继续.
 
 由模型在执行中的安全点调用。
 新会话通过 READ_CONTEXT 读取 continuation.md + --auto-recover 接上。
@@ -24,8 +24,8 @@ from pathlib import Path
 
 # 支持直接执行或模块导入
 from adapters.parallel._utils import (
-        DEEPSHIP_DIR,
-        find_deepship_root,
+        SPLITRUN_DIR,
+        find_splitrun_root,
         _check_wt_available,
         _validate_wu_id,
     )
@@ -66,14 +66,14 @@ CONTINUATION_TEMPLATE = """\
 
 
 def _load_state(root: Path) -> dict:
-    state_path = root / DEEPSHIP_DIR / "state.json"
+    state_path = root / SPLITRUN_DIR / "state.json"
     if state_path.exists():
         return json.loads(state_path.read_text(encoding="utf-8"))
     return {}
 
 
 def _load_work_units(root: Path) -> list[dict]:
-    wu_path = root / DEEPSHIP_DIR / "work_units.json"
+    wu_path = root / SPLITRUN_DIR / "work_units.json"
     if wu_path.exists():
         data = json.loads(wu_path.read_text(encoding="utf-8"))
         return data.get("work_units", [])
@@ -116,7 +116,7 @@ def write_continuation(
     notes: str = "（无特殊注意事项）",
     old_session_guide: str = "",
 ) -> Path:
-    """写入 .deepship/continuation.md，返回文件路径。"""
+    """写入 .splitrun/continuation.md，返回文件路径。"""
     info = _get_current_wu_info(root)
 
     if not completed:
@@ -153,7 +153,7 @@ def write_continuation(
         old_session_guide=old_session_guide,
     )
 
-    cont_path = root / DEEPSHIP_DIR / "continuation.md"
+    cont_path = root / SPLITRUN_DIR / "continuation.md"
     cont_path.write_text(content, encoding="utf-8")
     print(f"[ROTATE] continuation.md 已写入: {cont_path}")
     return cont_path
@@ -228,13 +228,13 @@ def spawn_new_session(root: Path) -> subprocess.Popen | None:
         return None
 
     session_id = str(uuid.uuid4())
-    title = f"deepship-continue"
+    title = f"splitrun-continue"
 
     cmd = [
         "wt.exe", "--title", title,
         "-d", str(root),
         "powershell", "-NoExit", "-Command",
-        f"claude --name deepship-continue --session-id {session_id} --model sonnet",
+        f"claude --name splitrun-continue --session-id {session_id} --model sonnet",
     ]
 
     try:
@@ -265,9 +265,9 @@ def rotate(
     返回 continuation.md 路径。
     kill_old=True 时尝试平台检测杀旧终端。
     """
-    root = project_root or find_deepship_root()
+    root = project_root or find_splitrun_root()
     if root is None:
-        print("[ERROR] 未找到 .deepship/ 目录。")
+        print("[ERROR] 未找到 .splitrun/ 目录。")
         sys.exit(1)
 
     print(f"[ROTATE] 项目: {root}")
@@ -325,7 +325,7 @@ def rotate(
         state["_rotated_at"] = datetime.now(timezone.utc).isoformat()
         state["_rotated_from_wu"] = current_wu_id
         state["_rotation_pending"] = True
-        state_path = root / DEEPSHIP_DIR / "state.json"
+        state_path = root / SPLITRUN_DIR / "state.json"
         state_path.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
 
     if no_spawn:
@@ -342,7 +342,7 @@ def rotate(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="DEEPSHIP Session Rotator v0.2 —— 保存 checkpoint + 启动新终端继续",
+        description="SPLITRUN Session Rotator v0.2 —— 保存 checkpoint + 启动新终端继续",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""\
 示例:

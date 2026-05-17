@@ -1,7 +1,7 @@
 """
-DEEPSHIP hard gates — 从 skill 文档提取的可测试判定逻辑。
+SPLITRUN hard gates — 从 skill 文档提取的可测试判定逻辑。
 
-这些函数实现 deepship-land/status 的门禁契约，
+这些函数实现 splitrun-land/status 的门禁契约，
 使执行质量不再依赖模型读文档。
 """
 
@@ -57,7 +57,7 @@ def claim_matches(pattern: str, target: str) -> bool:
     return target == pattern or target.startswith(pattern + "/")
 
 
-# ── Boundary gate (deepship-land Step 2) ──────────────────────────
+# ── Boundary gate (splitrun-land Step 2) ──────────────────────────
 
 def check_boundary(changed_files: list[str], files_claimed: list[str]) -> dict:
     """检查 changed_files 是否全部在 files_claimed 边界内。
@@ -79,7 +79,7 @@ def check_boundary(changed_files: list[str], files_claimed: list[str]) -> dict:
     }
 
 
-# ── Land determination gate (deepship-status Step 4) ───────────────
+# ── Land determination gate (splitrun-status Step 4) ───────────────
 
 LAND_OK = "CAN LAND"
 LAND_WAITING = "CANNOT LAND — waiting"
@@ -147,10 +147,10 @@ TERMINAL_LANE_STATUSES = {"done", "blocked"}
 
 
 def _default_report_reader(worktree_path: str) -> Optional[dict]:
-    """默认 report reader：从 worktree 路径读 .deepship/report.json。"""
+    """默认 report reader：从 worktree 路径读 .splitrun/report.json。"""
     if not worktree_path:
         return None
-    rp = Path(worktree_path) / ".deepship" / "report.json"
+    rp = Path(worktree_path) / ".splitrun" / "report.json"
     if not rp.exists():
         return None
     try:
@@ -168,7 +168,7 @@ def aggregate_lane_status(
     Args:
         index: lanes/index.json 的解析结果，格式为 {lane_id: {status, worktree, files_claimed, ...}}
         report_reader: 可注入的 report 读取函数，签名为 (worktree_path: str) -> dict | None。
-                       默认从文件系统读 <worktree>/.deepship/report.json。
+                       默认从文件系统读 <worktree>/.splitrun/report.json。
 
     Returns:
         list[dict]，每条包含:

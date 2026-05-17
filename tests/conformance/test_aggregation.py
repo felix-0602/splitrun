@@ -2,7 +2,7 @@
 Lane status aggregation contract tests — index.json + report.json → lane status dicts.
 
 核心契约: aggregate_lane_status() 的转换规则。
-deepship-status Step 2-4 和 deepship-land Step 1-2 依赖此转换的正确性。
+splitrun-status Step 2-4 和 splitrun-land Step 1-2 依赖此转换的正确性。
 """
 
 import unittest

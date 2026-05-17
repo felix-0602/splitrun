@@ -1,8 +1,8 @@
 ---
-name: deepship-scope
+name: splitrun-scope
 description: |
   当用户一次描述了多个互不依赖的功能、模块或改动时自动触发。检查是否可以拆成独立 Lane 并行推进。
-  分层标注：已确认事实、推断判断、未知问题、可能失败点。输出 .deepship/scope.md。
+  分层标注：已确认事实、推断判断、未知问题、可能失败点。输出 .splitrun/scope.md。
   Triggers: 用户同时提了多个任务/功能/模块、任务太大需要拆分、问"能不能并行""同时改""一起做""好几个模块"。
 allowed-tools:
   - Read
@@ -13,7 +13,7 @@ allowed-tools:
   - AskUserQuestion
 ---
 
-# /deepship-scope — 认知校准
+# /splitrun-scope — 认知校准
 
 > **scope 用引导，spawn 用确认，status 用观察，land 用硬门禁。**
 >
@@ -105,7 +105,7 @@ recommendation: spawn | do_not_spawn
 理由: [一句话说明为什么适合或不适合启动并行 Lane]
 ```
 
-**recommendation 字段是机器可读的固定格式**，必须严格写成 `recommendation: spawn` 或 `recommendation: do_not_spawn`，/deepship-spawn 依赖这个字段做前置检查。
+**recommendation 字段是机器可读的固定格式**，必须严格写成 `recommendation: spawn` 或 `recommendation: do_not_spawn`，/splitrun-spawn 依赖这个字段做前置检查。
 
 ### Step 6: 用户确认
 
@@ -116,7 +116,7 @@ recommendation: spawn | do_not_spawn
 
 ### Step 7: 写入
 
-用户确认后，写入 `.deepship/scope.md`。创建 `.deepship/` 目录如果需要。
+用户确认后，写入 `.splitrun/scope.md`。创建 `.splitrun/` 目录如果需要。
 
 ## 硬约束
 

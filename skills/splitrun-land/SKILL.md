@@ -1,8 +1,8 @@
 ---
-name: deepship-land
+name: splitrun-land
 description: |
   收敛并行 Lane——收集 report、跑 Boundary/Evidence/Integration 三道门禁、合并 git 分支、清理 worktree。
-  输出 .deepship/land-report.md 作为交付证据。三道检查全部通过才能 merge。
+  输出 .splitrun/land-report.md 作为交付证据。三道检查全部通过才能 merge。
   Triggers: 所有 lane 都 done、用户说"合并""收一下""land""交付""收尾"。
 allowed-tools:
   - Read
@@ -14,7 +14,7 @@ allowed-tools:
   - AskUserQuestion
 ---
 
-# /deepship-land — 收敛、验证、合并、交付
+# /splitrun-land — 收敛、验证、合并、交付
 
 这是闭环的最后一步，也是最重的一步。只在前置条件满足时执行。
 
@@ -22,13 +22,13 @@ allowed-tools:
 
 - 所有 active Lane 的 report.json 存在，且 status=done
 - 无越界（或越界已被用户确认可接受）
-- 建议先跑 `/deepship-status` 确认状态
+- 建议先跑 `/splitrun-status` 确认状态
 
 ## 流程
 
 ### Step 1: 收集 Lane 报告
 
-读 `.deepship/lanes/index.json`。对每个 active Lane，从 `worktree` 字段取 worktree 路径，读 `<worktree>/.deepship/report.json`。
+读 `.splitrun/lanes/index.json`。对每个 active Lane，从 `worktree` 字段取 worktree 路径，读 `<worktree>/.splitrun/report.json`。
 
 提取每个 Lane 的：
 - `changed_files`（实际改了哪些文件）
@@ -120,7 +120,7 @@ git merge lane/LANE-XXX --no-ff -m "merge: LANE-XXX — [任务简述]"
 
 ```bash
 # 删除 worktree
-git worktree remove ~/.claude/.deepship-worktrees/LANE-XXX
+git worktree remove ~/.claude/.splitrun-worktrees/LANE-XXX
 
 # 删除 Lane 分支（已合并）
 git branch -d lane/LANE-XXX
@@ -130,7 +130,7 @@ git branch -d lane/LANE-XXX
 
 ### Step 7: 写交付摘要
 
-写入 `.deepship/land-report.md`：
+写入 `.splitrun/land-report.md`：
 
 ```markdown
 # Land Report — [时间戳]

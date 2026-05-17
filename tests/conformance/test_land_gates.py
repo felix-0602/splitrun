@@ -1,5 +1,5 @@
 """
-Land determination gate contract tests — deepship-status Step 4 + deepship-land 前置。
+Land determination gate contract tests — splitrun-status Step 4 + splitrun-land 前置。
 
 核心契约: CAN LAND / CANNOT LAND 判定规则的 5 种状态。
 """

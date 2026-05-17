@@ -16,7 +16,7 @@ class BrainDispatcher:
 
     def __init__(self, project_root: Path | str = "."):
         self.root = Path(project_root).resolve()
-        self.deepship = self.root / ".deepship"
+        self.splitrun = self.root / ".splitrun"
 
     def dispatch(self) -> list[dict]:
         """读 work_units.json，生成 Lane 分派计划（plan-only，不写 active lane index）。"""
@@ -29,7 +29,7 @@ class BrainDispatcher:
         return lanes
 
     def _load_pending_wus(self) -> list[dict]:
-        path = self.deepship / "work_units.json"
+        path = self.splitrun / "work_units.json"
         if not path.exists():
             return []
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -85,13 +85,13 @@ class BrainDispatcher:
         return False
 
     def _write_lane_plan(self, lanes: list[dict]) -> None:
-        """写 lane 分派计划到 .deepship/lane_plan.json（plan-only，不含 worktree）。
+        """写 lane 分派计划到 .splitrun/lane_plan.json（plan-only，不含 worktree）。
 
         与 active lane index（lanes/index.json）分离：
         - lane_plan.json = 分派计划（dispatch 写，人工参考；spawn 当前不消费此文件）
         - lanes/index.json = 活跃 Lane 状态（spawn_lane.register_lane 写）
         """
-        plan_path = self.deepship / "lane_plan.json"
+        plan_path = self.splitrun / "lane_plan.json"
         plan_path.parent.mkdir(parents=True, exist_ok=True)
         plan = []
         for lane in lanes:
@@ -130,7 +130,7 @@ class BrainDispatcher:
         return (
             "# Lane: {lane_id}\n\n"
             "## 任务\n"
-            "你是 DEEPSHIP Lane {lane_id}。在隔离的 git worktree 中执行分配的 WU。\n\n"
+            "你是 SPLITRUN Lane {lane_id}。在隔离的 git worktree 中执行分配的 WU。\n\n"
             "## 分配的 WU\n"
             "{wu_list}\n\n"
             "## 允许修改的文件\n"
@@ -138,11 +138,11 @@ class BrainDispatcher:
             "## 模型\n"
             "{model}\n\n"
             "## 执行流程\n"
-            "1. 读 .deepship/lanes/{lane_id}/.deepship/work_units.json\n"
+            "1. 读 .splitrun/lanes/{lane_id}/.splitrun/work_units.json\n"
             "2. 执行每个 WU，在 files_allowed 边界内工作\n"
-            "3. 完成后写 .deepship/report.json\n\n"
+            "3. 完成后写 .splitrun/report.json\n\n"
             "## 约束\n"
             "- 只改 files_allowed 内的文件\n"
-            "- 不写 root .deepship/ 元数据\n"
+            "- 不写 root .splitrun/ 元数据\n"
             "- 遇阻→升级给 Brain MONITOR\n"
         )

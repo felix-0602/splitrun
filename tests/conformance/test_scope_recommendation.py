@@ -1,8 +1,8 @@
 """
-Scope recommendation contract tests — deepship-scope 机器可读契约。
+Scope recommendation contract tests — splitrun-scope 机器可读契约。
 
 核心契约: recommendation 字段必须是 'spawn' 或 'do_not_spawn'（下划线）。
-deepship-spawn 依赖该字段做前置检查，任何格式偏差都会破坏 spawn。
+splitrun-spawn 依赖该字段做前置检查，任何格式偏差都会破坏 spawn。
 """
 
 import unittest

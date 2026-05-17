@@ -1,4 +1,4 @@
-"""DEEPSHIP v0 Parallel — Lane spawner and rotate utilities."""
+"""SPLITRUN v0 Parallel — Lane spawner and rotate utilities."""
 
 from adapters.parallel.spawn_lane import (
     LaneSpawner,

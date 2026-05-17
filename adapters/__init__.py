@@ -1,1 +1,1 @@
-"""DEEPSHIP v0 adapters — Brain dispatch/monitor + Lane spawner."""
+"""SPLITRUN v0 adapters — Brain dispatch/monitor + Lane spawner."""

@@ -1,8 +1,8 @@
 # Machine-local Claude Code artifacts (not versioned)
 .claude/*
-# Exception: DEEPSHIP project state IS versioned
-!.claude/DEEPSHIP/
-!.claude/DEEPSHIP/**
+# Exception: SPLITRUN project state IS versioned
+!.claude/SPLITRUN/
+!.claude/SPLITRUN/**
 
 # OS files
 .DS_Store
@@ -13,11 +13,11 @@ desktop.ini
 __pycache__/
 *.py[cod]
 
-# DEEPSHIP runtime state (generated per-session)
-.deepship/lanes/
-.deepship/lane_plan.json
-.deepship/scope.md
-.deepship/land-report.md
-.deepship/index.json
-.deepship/*.bak
+# SPLITRUN runtime state (generated per-session)
+.splitrun/lanes/
+.splitrun/lane_plan.json
+.splitrun/scope.md
+.splitrun/land-report.md
+.splitrun/index.json
+.splitrun/*.bak
 .planning/

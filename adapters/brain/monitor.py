@@ -16,7 +16,7 @@ class BrainMonitor:
 
     def __init__(self, project_root: Path | str = "."):
         self.root = Path(project_root).resolve()
-        self.deepship = self.root / ".deepship"
+        self.splitrun = self.root / ".splitrun"
 
     def check_all_lanes(self) -> dict:
         """检查所有 active lane 的状态，返回决策。"""
@@ -32,7 +32,7 @@ class BrainMonitor:
         return self._decide(active, reports)
 
     def _load_lane_index(self) -> dict:
-        path = self.deepship / "lanes" / "index.json"
+        path = self.splitrun / "lanes" / "index.json"
         if not path.exists():
             return {}
         try:
@@ -45,7 +45,7 @@ class BrainMonitor:
         worktree = info.get("worktree", "")
         if not worktree:
             return None
-        path = Path(worktree) / ".deepship" / "report.json"
+        path = Path(worktree) / ".splitrun" / "report.json"
         if not path.exists():
             return None
         try:

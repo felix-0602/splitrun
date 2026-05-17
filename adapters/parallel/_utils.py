@@ -1,14 +1,14 @@
-"""DEEPSHIP v0 shared utilities."""
+"""SPLITRUN v0 shared utilities."""
 import os, re, subprocess
 from pathlib import Path
 
-DEEPSHIP_DIR = ".deepship"
-WORKTREE_PARENT = os.path.join(os.path.expanduser("~"), ".claude", ".deepship-worktrees")
+SPLITRUN_DIR = ".splitrun"
+WORKTREE_PARENT = os.path.join(os.path.expanduser("~"), ".claude", ".splitrun-worktrees")
 
-def find_deepship_root(start=None):
+def find_splitrun_root(start=None):
     current = (start or Path.cwd()).resolve()
     while True:
-        if (current / DEEPSHIP_DIR).is_dir():
+        if (current / SPLITRUN_DIR).is_dir():
             return current
         parent = current.parent
         if parent == current:
@@ -30,14 +30,14 @@ def create_worktree(name, project_root=None):
 
     Args:
         name: Lane ID (e.g. "LANE-001"), used as worktree dir name and branch suffix.
-        project_root: Path to project root. If None, auto-detected via find_deepship_root().
+        project_root: Path to project root. If None, auto-detected via find_splitrun_root().
 
     Returns:
         Path to the new worktree, or None on failure.
     """
     if not _check_wt_available():
         return None
-    root = project_root or find_deepship_root()
+    root = project_root or find_splitrun_root()
     if not root:
         return None
     wt_path = Path(WORKTREE_PARENT) / name

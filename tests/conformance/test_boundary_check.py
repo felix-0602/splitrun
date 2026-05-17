@@ -1,5 +1,5 @@
 """
-Boundary check contract tests — deepship-land Step 2 硬门禁。
+Boundary check contract tests — splitrun-land Step 2 硬门禁。
 
 核心契约: changed_files ⊆ files_claimed
 越界必须被检测，且检测结果可被 land 和 status 消费。

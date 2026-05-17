@@ -1,5 +1,5 @@
 ---
-name: deepship-status
+name: splitrun-status
 description: |
   查看所有活跃 Lane 的状态——哪些 done、blocked、还在跑、越界。判定能不能 land。只读，不改任何文件。
   Triggers: 用户问"进度怎么样""做完了吗""看一下 lane""status""状态"、lane 跑了一段时间。
@@ -10,7 +10,7 @@ allowed-tools:
   - Grep
 ---
 
-# /deepship-status — Lane 状态聚合
+# /splitrun-status — Lane 状态聚合
 
 只读。读 `lanes/index.json` 和各 Lane 的 `report.json`，汇总状态。
 
@@ -22,7 +22,7 @@ allowed-tools:
 python -c "
 import json
 from pathlib import Path
-idx = Path('.deepship/lanes/index.json')
+idx = Path('.splitrun/lanes/index.json')
 if idx.exists():
     data = json.loads(idx.read_text(encoding='utf-8'))
     for lid, info in data.items():
@@ -32,17 +32,17 @@ else:
 "
 ```
 
-如果输出 `NO_LANES`：告知用户"没有活跃 Lane，先跑 /deepship-spawn"。
+如果输出 `NO_LANES`：告知用户"没有活跃 Lane，先跑 /splitrun-spawn"。
 
 ### Step 2: 读各 Lane 报告
 
-对每个 active Lane，从 index.json 取 `worktree` 路径，读 `<worktree>/.deepship/report.json`。
+对每个 active Lane，从 index.json 取 `worktree` 路径，读 `<worktree>/.splitrun/report.json`。
 
 ```bash
 python -c "
 import json
 from pathlib import Path
-idx = Path('.deepship/lanes/index.json')
+idx = Path('.splitrun/lanes/index.json')
 if idx.exists():
     data = json.loads(idx.read_text(encoding='utf-8'))
     for lid, info in data.items():
@@ -109,9 +109,9 @@ LANE-004  done       [任务简述]
 ### Step 5: 建议下一步
 
 根据判定给出明确动作：
-- CAN LAND → "跑 /deepship-land 收敛合并"
+- CAN LAND → "跑 /splitrun-land 收敛合并"
 - waiting → "等 Lane 完成后再检查"
-- blocked → "回 /deepship-scope 重新评估被阻塞的 WU"
+- blocked → "回 /splitrun-scope 重新评估被阻塞的 WU"
 - boundary → "确认越界改动是否需要合并到 scope，或回退越界文件"
 
 ## 约束

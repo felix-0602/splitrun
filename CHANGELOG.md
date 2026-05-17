@@ -1,11 +1,21 @@
 # Changelog
 
+## [v0.2.0] — 2026-05-17
+
+### 重命名: DeepShip → SplitRun
+
+DeepShip 暗示一个庞大的常驻框架。v0 已经是四个按需命令的轻量工具，名字应该反映本质：**拆了就跑**。
+
+- 全线重命名：`DEEPSHIP` → `SPLITRUN`、`deepship` → `splitrun`、`/deepship-*` → `/splitrun-*`、`.deepship/` → `.splitrun/`
+- Skills: `splitrun-scope`, `splitrun-spawn`, `splitrun-status`, `splitrun-land`
+- Skill 描述加入中文场景触发词
+
 ## [v0.1.1] — 2026-05-17
 
 ### 契约修复 + 硬门禁可测试化
 
 **scope/spawn 机器可读契约对齐**
-- `deepship-spawn/SKILL.md:23`：`do not spawn` → `do_not_spawn`，与 `deepship-scope/SKILL.md:108` 的机器可读格式一致
+- `splitrun-spawn/SKILL.md:23`：`do not spawn` → `do_not_spawn`，与 `splitrun-scope/SKILL.md:108` 的机器可读格式一致
 
 **dispatch 降级为 plan-only**
 - `adapters/brain/dispatch.py`：不再写 `lanes/index.json`（旧版缺 `worktree` 字段，制造 verify 不通过的状态）
@@ -32,10 +42,10 @@ hooks、revolution、interrupt、A2A、5 层适配器、20+ 目录。
 
 v0 是四个按需调用的命令：
 
-- `/deepship-scope` — 任务共识对齐，判断是否值得并行
-- `/deepship-spawn` — 拆 WU，开隔离 worktree，并行启动 CC 会话
-- `/deepship-status` — 查看 Lane 状态，判定能否 land
-- `/deepship-land` — Boundary/Evidence/Integration 三类检查 + merge + 交付摘要
+- `/splitrun-scope` — 任务共识对齐，判断是否值得并行
+- `/splitrun-spawn` — 拆 WU，开隔离 worktree，并行启动 CC 会话
+- `/splitrun-status` — 查看 Lane 状态，判定能否 land
+- `/splitrun-land` — Boundary/Evidence/Integration 三类检查 + merge + 交付摘要
 
 ### 砍掉的内容
 

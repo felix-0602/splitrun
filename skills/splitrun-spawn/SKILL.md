@@ -1,5 +1,5 @@
 ---
-name: deepship-spawn
+name: splitrun-spawn
 description: |
   当 scope.md 已有且 recommendation=spawn 时触发。读 scope.md，拆 Work Unit，
   在隔离 git worktree 中并行启动 Claude Code 会话。用户确认拆分方案后才启动。
@@ -14,13 +14,13 @@ allowed-tools:
   - AskUserQuestion
 ---
 
-# /deepship-spawn — 并行 Lane 启动
+# /splitrun-spawn — 并行 Lane 启动
 
 读 `scope.md`，拆 WU，开隔离 git worktree，启动独立 Claude Code 会话。
 
 ## 前置条件
 
-`.deepship/scope.md` 必须存在且 `recommendation: spawn`。如果不存在或 recommendation 是 `do_not_spawn`，告知用户先跑 `/deepship-scope`。
+`.splitrun/scope.md` 必须存在且 `recommendation: spawn`。如果不存在或 recommendation 是 `do_not_spawn`，告知用户先跑 `/splitrun-scope`。
 
 ## 流程
 
@@ -83,12 +83,12 @@ print(f'Created: {result[\"lane_id\"]} at {result[\"worktree_path\"]}')
 "
 ```
 
-如果 spawn_lane.py 不可用（不在 DEEPSHIP 项目内），手动执行：
+如果 spawn_lane.py 不可用（不在 SplitRun 项目内），手动执行：
 ```bash
-git worktree add ~/.claude/.deepship-worktrees/LANE-XXX -b lane/LANE-XXX
+git worktree add ~/.claude/.splitrun-worktrees/LANE-XXX -b lane/LANE-XXX
 ```
 
-然后在 worktree 中写入 `.deepship/lanes/LANE-XXX/task.md`：
+然后在 worktree 中写入 `.splitrun/lanes/LANE-XXX/task.md`：
 ```markdown
 # LANE-XXX 任务
 
@@ -103,13 +103,13 @@ git worktree add ~/.claude/.deepship-worktrees/LANE-XXX -b lane/LANE-XXX
 
 ## 约束
 - 只改 files_claimed 内的文件
-- 完成后写 .deepship/lanes/LANE-XXX/report.json
+- 完成后写 .splitrun/lanes/LANE-XXX/report.json
 - 完成写 report 后就可以关闭，Brain 会来 land
 ```
 
 ### Step 5: 注册 + 报告
 
-更新 `.deepship/lanes/index.json`（如果 spawn_lane.py 没自动做）。
+更新 `.splitrun/lanes/index.json`（如果 spawn_lane.py 没自动做）。
 
 输出摘要：
 ```
@@ -117,8 +117,8 @@ git worktree add ~/.claude/.deepship-worktrees/LANE-XXX -b lane/LANE-XXX
   LANE-001 — [任务简述] — [worktree路径]
   LANE-002 — [任务简述] — [worktree路径]
 
-下一步: 在各 Lane 终端中工作，完成后用 /deepship-status 查看进度，
-       全部完成后用 /deepship-land 收敛合并。
+下一步: 在各 Lane 终端中工作，完成后用 /splitrun-status 查看进度，
+       全部完成后用 /splitrun-land 收敛合并。
 ```
 
 ## 约束
