@@ -1,10 +1,10 @@
 # 并行适配器
 
-> 基于 worktree 隔离的 fork/collector 适配器——SPLITRUN 执行纪律的分会话并行实现。
+> 基于 worktree 隔离的 fork/collector 适配器——SPLIT-RUN 执行纪律的分会话并行实现。
 
-本适配器负责 SPLITRUN 的 **fork** 侧：当 PLAN_STEP 已把任务拆成独立 Work Unit 后，为互不依赖的 WU 创建隔离 git worktree，让多个 Claude Code 会话真并行工作。
+本适配器负责 SPLIT-RUN 的 **fork** 侧：当 PLAN_STEP 已把任务拆成独立 Work Unit 后，为互不依赖的 WU 创建隔离 git worktree，让多个 Claude Code 会话真并行工作。
 
-它不取代 SPLITRUN 主循环。规划、验证、记录和最终集成仍由主线程掌控。
+它不取代 SPLIT-RUN 主循环。规划、验证、记录和最终集成仍由主线程掌控。
 
 ## 什么时候用 fork
 
@@ -95,7 +95,7 @@ Collector 逐项验证：
 - `changed_files ⊆ files_allowed`
 - `tests_run` 覆盖 `acceptance_tests`
 - 没有两个 worker 修改了同一文件
-- 没有 worker 修改了 SPLITRUN 元数据
+- 没有 worker 修改了 SPLIT-RUN 元数据
 
 未通过 → 回到 `REPAIR` 或 `PLAN_STEP`。
 

@@ -1,5 +1,5 @@
 """
-SPLITRUN v0 self-verification.
+SPLIT-RUN v0 self-verification.
 Zero external dependencies. Run from repo root:
   python checks/verify.py
 """

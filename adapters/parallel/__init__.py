@@ -1,4 +1,4 @@
-"""SPLITRUN v0 Parallel — Lane spawner and rotate utilities."""
+"""SPLIT-RUN v0 Parallel — Lane spawner and rotate utilities."""
 
 from adapters.parallel.spawn_lane import (
     LaneSpawner,

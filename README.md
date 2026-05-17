@@ -1,8 +1,8 @@
-# SPLITRUN v0
+# SPLIT-RUN v0
 
 > **按需启动的并行开发闭环。** 把复杂任务拆成独立 Work Unit，在隔离的 git worktree 中并行执行，最后带证据收敛合并。
 
-SPLITRUN 不是常驻框架。它是四个按需调用的命令，解决 Claude Code 的一个根本限制：**单线程、单上下文。**
+SPLIT-RUN 不是常驻框架。它是四个按需调用的命令，解决 Claude Code 的一个根本限制：**单线程、单上下文。**
 
 ## 四个命令
 
@@ -31,7 +31,7 @@ scope → spawn → status → land
 - 单次对话上下文不够，想并行推进
 - 需要验证交付证据，不只是"AI 说做完了"
 
-不适合并行的小任务直接用 Claude Code 就好。SPLITRUN 的价值不是强行并行，是判断什么时候值得并行。
+不适合并行的小任务直接用 Claude Code 就好。SPLIT-RUN 的价值不是强行并行，是判断什么时候值得并行。
 
 ## 持久化
 
@@ -53,7 +53,7 @@ python checks/verify.py
 ## 仓库结构
 
 ```text
-SPLITRUN/
+SPLIT-RUN/
 ├── skills/                     # 4 个 skill 文件
 │   ├── splitrun-scope/SKILL.md
 │   ├── splitrun-spawn/SKILL.md

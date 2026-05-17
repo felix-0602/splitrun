@@ -130,7 +130,7 @@ class BrainDispatcher:
         return (
             "# Lane: {lane_id}\n\n"
             "## 任务\n"
-            "你是 SPLITRUN Lane {lane_id}。在隔离的 git worktree 中执行分配的 WU。\n\n"
+            "你是 SPLIT-RUN Lane {lane_id}。在隔离的 git worktree 中执行分配的 WU。\n\n"
             "## 分配的 WU\n"
             "{wu_list}\n\n"
             "## 允许修改的文件\n"

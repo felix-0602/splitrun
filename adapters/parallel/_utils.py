@@ -1,4 +1,4 @@
-"""SPLITRUN v0 shared utilities."""
+"""SPLIT-RUN v0 shared utilities."""
 import os, re, subprocess
 from pathlib import Path
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-SPLITRUN Lane Spawner v0.1 — 即时 lane 创建，集成 worktree + 交互式终端.
+SPLIT-RUN Lane Spawner v0.1 — 即时 lane 创建，集成 worktree + 交互式终端.
 
 lane = git worktree + 独立 Claude Code 会话 + lane_id.json 自动身份发现.
 与 dispatcher 互补: dispatcher 批量分派预定义 WU (claude -p 非交互),
@@ -304,10 +304,10 @@ class LaneSpawner:
         register_lane(self.root, lane_id, task[:100], wt_path, files)
 
         initial_prompt = (
-            f"SPLITRUN lane {lane_id} activated. "
+            f"SPLIT-RUN lane {lane_id} activated. "
             f"Run READ_CONTEXT: read .splitrun/lane_id.json, "
             f"then .splitrun/lanes/{lane_id}.md. "
-            f"Proceed through SPLITRUN state machine independently."
+            f"Proceed through SPLIT-RUN state machine independently."
         )
 
         proc = spawn_interactive_terminal(lane_id, wt_path, initial_prompt)

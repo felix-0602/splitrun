@@ -1,5 +1,5 @@
 """
-SPLITRUN hard gates — 从 skill 文档提取的可测试判定逻辑。
+SPLIT-RUN hard gates — 从 skill 文档提取的可测试判定逻辑。
 
 这些函数实现 splitrun-land/status 的门禁契约，
 使执行质量不再依赖模型读文档。

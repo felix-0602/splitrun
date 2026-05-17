@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-SPLITRUN Session Rotator v0.2 — 自旋转：保存 checkpoint → 开新终端继续.
+SPLIT-RUN Session Rotator v0.2 — 自旋转：保存 checkpoint → 开新终端继续.
 
 由模型在执行中的安全点调用。
 新会话通过 READ_CONTEXT 读取 continuation.md + --auto-recover 接上。
@@ -342,7 +342,7 @@ def rotate(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="SPLITRUN Session Rotator v0.2 —— 保存 checkpoint + 启动新终端继续",
+        description="SPLIT-RUN Session Rotator v0.2 —— 保存 checkpoint + 启动新终端继续",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""\
 示例:
