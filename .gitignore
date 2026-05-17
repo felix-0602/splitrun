@@ -21,3 +21,4 @@ __pycache__/
 .splitrun/index.json
 .splitrun/*.bak
 .planning/
+.deepship/
